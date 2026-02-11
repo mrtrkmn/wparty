@@ -19,7 +19,12 @@
       '.html5-main-video',                        // YouTube
       'video.vp-video',                           // Vimeo
       'video.vjs-tech',                           // Video.js (used by many sites)
-      'video[data-a-player-type="twitch"]'        // Twitch
+      'video[data-a-player-type="twitch"]',       // Twitch
+      'video[data-uia="video-player"]',           // Netflix
+      '.dv-player-fullscreen video',              // Amazon Prime Video
+      'video.btm-video-player',                   // Disney+
+      '.rendererContainer video',                 // Netflix (alternative)
+      '#dv-web-player video'                      // Amazon Prime Video (alternative)
     ];
 
     for (const selector of selectors) {
