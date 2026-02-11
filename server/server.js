@@ -280,7 +280,7 @@ wss.on('connection', (ws) => {
               participant.videoUrl = message.data.url || null;
             }
             
-            // Broadcast video info to other participants
+            // Broadcast video info to other participants (sender already has this info)
             broadcastToParty(currentPartyCode, {
               type: 'video-info',
               data: message.data,
@@ -288,7 +288,7 @@ wss.on('connection', (ws) => {
               timestamp
             }, clientId);
 
-            // Broadcast updated participant list with sync status
+            // Broadcast updated participant list with sync status to all (including sender)
             broadcastToAllInParty(currentPartyCode, {
               type: 'participants',
               participants: getParticipantList(currentPartyCode),
