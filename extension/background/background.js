@@ -226,7 +226,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       if (sendToServer({ 
         type: 'create-party', 
         username: message.username,
-        password: message.password 
+        password: message.password,
+        persistent: message.persistent
       })) {
         sendResponse({ success: true });
       } else {

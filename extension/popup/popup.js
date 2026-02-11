@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Not in party elements
   const createUsernameInput = document.getElementById('createUsername');
   const createPasswordInput = document.getElementById('createPassword');
+  const persistentCheckbox = document.getElementById('persistentCheckbox');
   const createPartyBtn = document.getElementById('createPartyBtn');
   const joinUsernameInput = document.getElementById('joinUsername');
   const partyCodeInput = document.getElementById('partyCodeInput');
@@ -138,6 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   createPartyBtn.addEventListener('click', async () => {
     const username = createUsernameInput.value.trim();
     const password = createPasswordInput.value.trim();
+    const persistent = persistentCheckbox.checked;
     
     if (!username) {
       showError('Please enter your name');
@@ -154,12 +156,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       const response = await chrome.runtime.sendMessage({
         type: 'create-party',
         username: username,
-        password: password || null
+        password: password || null,
+        persistent: persistent
       });
 
       if (response.success) {
-        // Clear password field
+        // Clear password field and checkbox
         createPasswordInput.value = '';
+        persistentCheckbox.checked = false;
         // UI will be updated by message listener
       } else {
         showError(response.error || 'Failed to create party');

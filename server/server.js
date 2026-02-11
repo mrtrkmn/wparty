@@ -4,9 +4,10 @@ const crypto = require('crypto');
 
 const PORT = process.env.PORT || 8080;
 const HEARTBEAT_INTERVAL = 30000; // 30 seconds
+const PARTY_IDLE_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 // Store active parties/rooms
-// Structure: { partyCode: { participants: Map(clientId -> {ws, username}), video: {url, title}, passwordHash: string|null } }
+// Structure: { partyCode: { participants: Map(clientId -> {ws, username}), video: {url, title}, passwordHash: string|null, persistent: boolean, createdAt: number, lastActivity: number } }
 const parties = new Map();
 
 // Hash password using SHA-256
@@ -60,10 +61,33 @@ function getParticipantList(partyCode) {
 function cleanupEmptyParty(partyCode) {
   const party = parties.get(partyCode);
   if (party && party.participants.size === 0) {
-    parties.delete(partyCode);
-    console.log(`Party ${partyCode} cleaned up (empty)`);
+    // If party is persistent, update last activity but don't delete
+    if (party.persistent) {
+      party.lastActivity = Date.now();
+      console.log(`Persistent party ${partyCode} is now empty (last activity updated)`);
+    } else {
+      parties.delete(partyCode);
+      console.log(`Party ${partyCode} cleaned up (empty)`);
+    }
   }
 }
+
+// Clean up idle persistent parties (runs periodically)
+function cleanupIdleParties() {
+  const now = Date.now();
+  for (const [partyCode, party] of parties.entries()) {
+    if (party.persistent && party.participants.size === 0) {
+      const idleTime = now - party.lastActivity;
+      if (idleTime > PARTY_IDLE_TIMEOUT) {
+        parties.delete(partyCode);
+        console.log(`Persistent party ${partyCode} cleaned up (idle for ${Math.round(idleTime / 1000 / 60 / 60)} hours)`);
+      }
+    }
+  }
+}
+
+// Run cleanup every hour
+setInterval(cleanupIdleParties, 60 * 60 * 1000);
 
 // Create WebSocket server
 const wss = new WebSocket.Server({ port: PORT });
@@ -94,11 +118,15 @@ wss.on('connection', (ws) => {
           const partyCode = generatePartyCode();
           username = message.username || 'Anonymous';
           const passwordHash = hashPassword(message.password);
+          const persistent = message.persistent || false;
           
           parties.set(partyCode, {
             participants: new Map([[clientId, { ws, username }]]),
             video: null,
-            passwordHash: passwordHash
+            passwordHash: passwordHash,
+            persistent: persistent,
+            createdAt: timestamp,
+            lastActivity: timestamp
           });
 
           currentPartyCode = partyCode;
@@ -108,6 +136,7 @@ wss.on('connection', (ws) => {
             partyCode,
             username,
             hasPassword: !!passwordHash,
+            persistent: persistent,
             timestamp
           }));
 
@@ -155,7 +184,9 @@ wss.on('connection', (ws) => {
 
           // Add to new party
           currentPartyCode = joinPartyCode;
-          parties.get(joinPartyCode).participants.set(clientId, { ws, username });
+          const joinedParty = parties.get(joinPartyCode);
+          joinedParty.participants.set(clientId, { ws, username });
+          joinedParty.lastActivity = timestamp; // Update last activity time
 
           // Send join confirmation to the client
           ws.send(JSON.stringify({
@@ -163,7 +194,7 @@ wss.on('connection', (ws) => {
             partyCode: joinPartyCode,
             username,
             participants: getParticipantList(joinPartyCode),
-            video: parties.get(joinPartyCode).video,
+            video: joinedParty.video,
             timestamp
           }));
 
