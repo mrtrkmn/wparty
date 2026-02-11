@@ -100,6 +100,11 @@ async function connect() {
             chrome.runtime.sendMessage({ type: 'error', message: message.message }).catch(() => {});
             break;
 
+          case 'chat':
+            // Forward chat message to popup
+            chrome.runtime.sendMessage({ type: 'chat', data: message }).catch(() => {});
+            break;
+
           case 'pong':
             // Heartbeat response received
             break;
@@ -218,7 +223,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
 
     case 'create-party':
-      if (sendToServer({ type: 'create-party', username: message.username })) {
+      if (sendToServer({ 
+        type: 'create-party', 
+        username: message.username,
+        password: message.password,
+        persistent: message.persistent
+      })) {
         sendResponse({ success: true });
       } else {
         sendResponse({ success: false, error: 'Not connected' });
@@ -226,7 +236,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
 
     case 'join-party':
-      if (sendToServer({ type: 'join', partyCode: message.partyCode, username: message.username })) {
+      if (sendToServer({ 
+        type: 'join', 
+        partyCode: message.partyCode, 
+        username: message.username,
+        password: message.password
+      })) {
         sendResponse({ success: true });
       } else {
         sendResponse({ success: false, error: 'Not connected' });
@@ -251,6 +266,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     case 'video-info':
       if (sendToServer({ type: 'video-info', data: message.data })) {
+        sendResponse({ success: true });
+      } else {
+        sendResponse({ success: false, error: 'Not connected' });
+      }
+      break;
+
+    case 'send-chat':
+      if (sendToServer({ type: 'chat', message: message.message })) {
         sendResponse({ success: true });
       } else {
         sendResponse({ success: false, error: 'Not connected' });

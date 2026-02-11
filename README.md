@@ -6,9 +6,12 @@ A Chrome extension that synchronizes video playback across multiple participants
 
 - 🎥 **Real-time Synchronization**: Play, pause, seek, and rate changes are synced across all participants
 - 👥 **Multi-participant Support**: Watch with 2 or more people simultaneously
-- 🌐 **Multiple Platform Support**: Works with YouTube, Vimeo, Dailymotion, Twitch, and any HTML5 video
+- 🌐 **Multiple Platform Support**: Works with YouTube, Vimeo, Dailymotion, Twitch, Netflix, Amazon Prime Video, Disney+, and any HTML5 video
 - 🔒 **Private Parties**: Create and join parties with unique 6-character codes
-- 💬 **Participant List**: See who's watching with you
+- 🔐 **Password Protection**: Optional password protection for parties
+- 💬 **Text Chat**: Real-time text messaging between participants
+- 🏠 **Persistent Rooms**: Optional 24-hour persistence for party rooms
+- 👥 **Participant List**: See who's watching with you
 - 🎨 **Modern UI**: Beautiful dark-themed interface
 - 🔄 **Auto-reconnect**: Automatic reconnection with exponential backoff
 - ⚙️ **Configurable Server**: Set your own signaling server URL
@@ -19,6 +22,9 @@ A Chrome extension that synchronizes video playback across multiple participants
 - **Vimeo** (vimeo.com)
 - **Dailymotion** (dailymotion.com)
 - **Twitch** (twitch.tv)
+- **Netflix** (netflix.com)
+- **Amazon Prime Video** (primevideo.com, amazon.com)
+- **Disney+** (disneyplus.com)
 - **Generic HTML5 video** - Any website with a `<video>` element
 
 ## How It Works
@@ -252,13 +258,13 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ## Future Enhancements
 
+- [x] Text chat functionality ✅
+- [x] Password-protected parties ✅
+- [x] Persistent party rooms ✅
+- [x] More streaming platform support (Netflix, Amazon Prime Video, Disney+) ✅
 - [ ] Video chat integration
-- [ ] Text chat functionality
-- [ ] Password-protected parties
-- [ ] Persistent party rooms
 - [ ] Mobile app support
 - [ ] Browser extension for Firefox and Edge
-- [ ] More streaming platform support
 
 ---
 

@@ -23,6 +23,11 @@
           <h2>Create a Party</h2>
           <div class="form-group">
             <input type="text" id="createUsername" placeholder="Your name" maxlength="20">
+            <input type="password" id="createPassword" placeholder="Password (optional)" maxlength="50">
+            <div class="checkbox-group">
+              <input type="checkbox" id="persistentCheckbox">
+              <label for="persistentCheckbox" class="checkbox-label">Keep party alive when empty (24h)</label>
+            </div>
             <button id="createPartyBtn" class="btn btn-primary">Create Party</button>
           </div>
         </div>
@@ -34,6 +39,7 @@
           <div class="form-group">
             <input type="text" id="joinUsername" placeholder="Your name" maxlength="20">
             <input type="text" id="partyCodeInput" placeholder="Party code (e.g., ABC123)" maxlength="6">
+            <input type="password" id="joinPassword" placeholder="Password (if required)" maxlength="50">
             <button id="joinPartyBtn" class="btn btn-primary">Join Party</button>
           </div>
         </div>
@@ -73,6 +79,15 @@
         <div class="participants-section">
           <h3>Participants (<span id="participantCount">0</span>)</h3>
           <ul id="participantsList" class="participants-list"></ul>
+        </div>
+
+        <div class="chat-section">
+          <h3>Chat</h3>
+          <div id="chatMessages" class="chat-messages"></div>
+          <div class="chat-input-container">
+            <input type="text" id="chatInput" placeholder="Type a message..." maxlength="500">
+            <button id="sendChatBtn" class="btn btn-secondary">Send</button>
+          </div>
         </div>
 
         <button id="leavePartyBtn" class="btn btn-danger">Leave Party</button>
