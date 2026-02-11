@@ -25,6 +25,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const participantCount = document.getElementById('participantCount');
   const participantsList = document.getElementById('participantsList');
   const leavePartyBtn = document.getElementById('leavePartyBtn');
+  
+  // Chat elements
+  const chatMessages = document.getElementById('chatMessages');
+  const chatInput = document.getElementById('chatInput');
+  const sendChatBtn = document.getElementById('sendChatBtn');
 
   // Load saved username from storage
   const savedData = await chrome.storage.local.get(['username', 'serverUrl']);
@@ -276,6 +281,62 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // Send chat message
+  sendChatBtn.addEventListener('click', sendChatMessage);
+  
+  chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
+    }
+  });
+
+  async function sendChatMessage() {
+    const message = chatInput.value.trim();
+    
+    if (!message) {
+      return;
+    }
+
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'send-chat',
+        message: message
+      });
+      
+      chatInput.value = '';
+    } catch (error) {
+      console.error('Error sending chat message:', error);
+      showError('Failed to send message');
+    }
+  }
+
+  // Add chat message to UI
+  function addChatMessage(username, message, timestamp) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'chat-message';
+    
+    const usernameSpan = document.createElement('div');
+    usernameSpan.className = 'chat-message-username';
+    usernameSpan.textContent = username;
+    
+    const textSpan = document.createElement('div');
+    textSpan.className = 'chat-message-text';
+    textSpan.textContent = message;
+    
+    const timeSpan = document.createElement('div');
+    timeSpan.className = 'chat-message-time';
+    const date = new Date(timestamp);
+    timeSpan.textContent = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    messageDiv.appendChild(usernameSpan);
+    messageDiv.appendChild(textSpan);
+    messageDiv.appendChild(timeSpan);
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
   // Listen for messages from background script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('Popup received message:', message);
@@ -288,10 +349,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       case 'party-created':
       case 'joined':
         updateUI();
+        // Clear chat messages when joining/creating party
+        chatMessages.innerHTML = '';
         break;
 
       case 'left':
         showNotInPartyView();
+        // Clear chat messages when leaving party
+        chatMessages.innerHTML = '';
         break;
 
       case 'participants':
@@ -303,6 +368,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           videoInfoSection.style.display = 'block';
           videoTitle.textContent = message.data.data.title;
         }
+        break;
+
+      case 'chat':
+        addChatMessage(message.data.username, message.data.message, message.data.timestamp);
         break;
 
       case 'error':
