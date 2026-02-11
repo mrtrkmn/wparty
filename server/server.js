@@ -67,13 +67,13 @@ wss.on('connection', (ws) => {
   let clientId = uuidv4();
   let currentPartyCode = null;
   let username = null;
-  let isAlive = true;
+  ws.isAlive = true;
 
   console.log(`New connection: ${clientId}`);
 
   // Heartbeat mechanism
   ws.on('pong', () => {
-    isAlive = true;
+    ws.isAlive = true;
   });
 
   ws.on('message', (data) => {

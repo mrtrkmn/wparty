@@ -5,7 +5,7 @@ A Chrome extension that synchronizes video playback across multiple participants
 ## Features
 
 - 🎥 **Real-time Synchronization**: Play, pause, seek, and rate changes are synced across all participants
-- 👥 **Multi-participant Support**: Watch with 3 or more people simultaneously
+- 👥 **Multi-participant Support**: Watch with 2 or more people simultaneously
 - 🌐 **Multiple Platform Support**: Works with YouTube, Vimeo, Dailymotion, Twitch, and any HTML5 video
 - 🔒 **Private Parties**: Create and join parties with unique 6-character codes
 - 💬 **Participant List**: See who's watching with you
