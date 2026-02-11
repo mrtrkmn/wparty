@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const PORT = process.env.PORT || 8080;
 const HEARTBEAT_INTERVAL = 30000; // 30 seconds
 const PARTY_IDLE_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const MS_TO_HOURS = 1000 * 60 * 60; // Conversion constant from milliseconds to hours
 
 // Store active parties/rooms
 // Structure: { partyCode: { participants: Map(clientId -> {ws, username}), video: {url, title}, passwordHash: string|null, persistent: boolean, createdAt: number, lastActivity: number } }
@@ -80,7 +81,8 @@ function cleanupIdleParties() {
       const idleTime = now - party.lastActivity;
       if (idleTime > PARTY_IDLE_TIMEOUT) {
         parties.delete(partyCode);
-        console.log(`Persistent party ${partyCode} cleaned up (idle for ${Math.round(idleTime / 1000 / 60 / 60)} hours)`);
+        const idleHours = Math.round(idleTime / MS_TO_HOURS);
+        console.log(`Persistent party ${partyCode} cleaned up (idle for ${idleHours} hours)`);
       }
     }
   }
@@ -159,6 +161,15 @@ wss.on('connection', (ws) => {
 
           // Check password if party is password-protected
           const party = parties.get(joinPartyCode);
+          if (!party) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              message: 'Party not found',
+              timestamp
+            }));
+            break;
+          }
+          
           if (party.passwordHash) {
             const providedPasswordHash = hashPassword(message.password);
             if (providedPasswordHash !== party.passwordHash) {

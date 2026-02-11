@@ -385,7 +385,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         break;
 
       case 'chat':
-        addChatMessage(message.data.username, message.data.message, message.data.timestamp);
+        if (message.data && message.data.username && message.data.message && message.data.timestamp) {
+          addChatMessage(message.data.username, message.data.message, message.data.timestamp);
+        }
         break;
 
       case 'error':

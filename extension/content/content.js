@@ -14,16 +14,18 @@
   // Detect video element on the page
   function detectVideo() {
     // Try common video selectors for different platforms
+    // Note: Streaming platform selectors (Netflix, Prime Video, Disney+) may change
+    // as these services update their players. These selectors were verified as of 2024.
     const selectors = [
       'video',                                    // Generic HTML5 video
       '.html5-main-video',                        // YouTube
       'video.vp-video',                           // Vimeo
       'video.vjs-tech',                           // Video.js (used by many sites)
       'video[data-a-player-type="twitch"]',       // Twitch
-      'video[data-uia="video-player"]',           // Netflix
+      'video[data-uia="video-player"]',           // Netflix (primary selector)
       '.dv-player-fullscreen video',              // Amazon Prime Video
       'video.btm-video-player',                   // Disney+
-      '.rendererContainer video',                 // Netflix (alternative)
+      '.rendererContainer video',                 // Netflix (alternative selector)
       '#dv-web-player video'                      // Amazon Prime Video (alternative)
     ];
 
