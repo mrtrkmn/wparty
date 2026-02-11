@@ -8,6 +8,7 @@
   let isSyncing = false; // Flag to prevent sync loops
   let isInParty = false;
   let lastSyncTime = 0;
+  let lastKnownUrl = window.location.href; // Track URL for SPA navigation
   const SYNC_COOLDOWN = 500; // Minimum time between sync events in ms
   const TIME_DRIFT_TOLERANCE = 2; // Only sync if time difference > 2 seconds
 
@@ -243,6 +244,13 @@
         console.log('Watch Party: Left party');
         break;
 
+      case 'video-info':
+        // Party video URL updated by another participant
+        if (message.data && message.data.data) {
+          console.log('Watch Party: Party video info updated:', message.data.data.url);
+        }
+        break;
+
       default:
         console.log('Watch Party: Unknown message type:', message.type);
     }
@@ -270,6 +278,17 @@
     childList: true,
     subtree: true
   });
+
+  // Detect URL changes for SPAs (e.g., YouTube navigation)
+  setInterval(() => {
+    if (window.location.href !== lastKnownUrl) {
+      lastKnownUrl = window.location.href;
+      console.log('Watch Party: URL changed, re-detecting video');
+      detachVideoListeners();
+      videoElement = null;
+      initVideo();
+    }
+  }, 1000);
 
   console.log('Watch Party: Content script initialized');
 })();

@@ -51,11 +51,16 @@ function broadcastToAllInParty(partyCode, message) {
   });
 }
 
-// Get list of participant usernames in a party
+// Get list of participants in a party with sync status
 function getParticipantList(partyCode) {
   const party = parties.get(partyCode);
   if (!party) return [];
-  return Array.from(party.participants.values()).map(client => client.username);
+  const partyVideoUrl = party.video ? party.video.url : null;
+  return Array.from(party.participants.values()).map(client => ({
+    username: client.username,
+    videoUrl: client.videoUrl || null,
+    synced: partyVideoUrl ? (client.videoUrl === partyVideoUrl) : false
+  }));
 }
 
 // Clean up empty parties
@@ -123,7 +128,7 @@ wss.on('connection', (ws) => {
           const persistent = message.persistent || false;
           
           parties.set(partyCode, {
-            participants: new Map([[clientId, { ws, username }]]),
+            participants: new Map([[clientId, { ws, username, videoUrl: null }]]),
             video: null,
             passwordHash: passwordHash,
             persistent: persistent,
@@ -196,7 +201,7 @@ wss.on('connection', (ws) => {
           // Add to new party
           currentPartyCode = joinPartyCode;
           const joinedParty = parties.get(joinPartyCode);
-          joinedParty.participants.set(clientId, { ws, username });
+          joinedParty.participants.set(clientId, { ws, username, videoUrl: null });
           joinedParty.lastActivity = timestamp; // Update last activity time
 
           // Send join confirmation to the client
@@ -266,11 +271,27 @@ wss.on('connection', (ws) => {
         case 'video-info':
           // Update video information for the party
           if (currentPartyCode && parties.has(currentPartyCode)) {
-            parties.get(currentPartyCode).video = message.data;
+            const party = parties.get(currentPartyCode);
+            party.video = message.data;
             
-            broadcastToAllInParty(currentPartyCode, {
+            // Update this participant's video URL
+            const participant = party.participants.get(clientId);
+            if (participant) {
+              participant.videoUrl = message.data.url || null;
+            }
+            
+            // Broadcast video info to other participants
+            broadcastToParty(currentPartyCode, {
               type: 'video-info',
               data: message.data,
+              username: username,
+              timestamp
+            }, clientId);
+
+            // Broadcast updated participant list with sync status
+            broadcastToAllInParty(currentPartyCode, {
+              type: 'participants',
+              participants: getParticipantList(currentPartyCode),
               timestamp
             });
           }

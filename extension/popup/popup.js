@@ -114,14 +114,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateParticipantsList(data.participants || []);
   }
 
-  // Update participants list
+  // Update participants list with sync status indicators
   function updateParticipantsList(participants) {
     participantCount.textContent = participants.length;
     participantsList.innerHTML = '';
 
     participants.forEach(participant => {
       const li = document.createElement('li');
-      li.textContent = participant;
+
+      // Handle both string format (legacy) and object format
+      if (typeof participant === 'string') {
+        li.textContent = participant;
+      } else {
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'participant-name';
+        nameSpan.textContent = participant.username;
+
+        const statusSpan = document.createElement('span');
+        statusSpan.className = 'sync-indicator';
+
+        if (!participant.videoUrl) {
+          statusSpan.classList.add('no-video');
+          statusSpan.title = 'No video detected';
+        } else if (participant.synced) {
+          statusSpan.classList.add('synced');
+          statusSpan.title = 'Synced';
+        } else {
+          statusSpan.classList.add('not-synced');
+          statusSpan.title = 'Watching different video';
+        }
+
+        li.appendChild(nameSpan);
+        li.appendChild(statusSpan);
+      }
+
       participantsList.appendChild(li);
     });
   }
