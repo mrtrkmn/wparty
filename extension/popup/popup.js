@@ -9,9 +9,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Not in party elements
   const createUsernameInput = document.getElementById('createUsername');
+  const createPasswordInput = document.getElementById('createPassword');
   const createPartyBtn = document.getElementById('createPartyBtn');
   const joinUsernameInput = document.getElementById('joinUsername');
   const partyCodeInput = document.getElementById('partyCodeInput');
+  const joinPasswordInput = document.getElementById('joinPassword');
   const joinPartyBtn = document.getElementById('joinPartyBtn');
   const serverUrlInput = document.getElementById('serverUrl');
   const saveServerBtn = document.getElementById('saveServerBtn');
@@ -135,6 +137,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Create party
   createPartyBtn.addEventListener('click', async () => {
     const username = createUsernameInput.value.trim();
+    const password = createPasswordInput.value.trim();
     
     if (!username) {
       showError('Please enter your name');
@@ -150,10 +153,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const response = await chrome.runtime.sendMessage({
         type: 'create-party',
-        username: username
+        username: username,
+        password: password || null
       });
 
       if (response.success) {
+        // Clear password field
+        createPasswordInput.value = '';
         // UI will be updated by message listener
       } else {
         showError(response.error || 'Failed to create party');
@@ -171,6 +177,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   joinPartyBtn.addEventListener('click', async () => {
     const username = joinUsernameInput.value.trim();
     const partyCode = partyCodeInput.value.trim().toUpperCase();
+    const password = joinPasswordInput.value.trim();
 
     if (!username) {
       showError('Please enter your name');
@@ -192,10 +199,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       const response = await chrome.runtime.sendMessage({
         type: 'join-party',
         partyCode: partyCode,
-        username: username
+        username: username,
+        password: password || null
       });
 
       if (response.success) {
+        // Clear password field
+        joinPasswordInput.value = '';
         // UI will be updated by message listener
         partyCodeInput.value = '';
       } else {

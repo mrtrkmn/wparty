@@ -1,12 +1,19 @@
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 
 const PORT = process.env.PORT || 8080;
 const HEARTBEAT_INTERVAL = 30000; // 30 seconds
 
 // Store active parties/rooms
-// Structure: { partyCode: { participants: Map(clientId -> {ws, username}), video: {url, title} } }
+// Structure: { partyCode: { participants: Map(clientId -> {ws, username}), video: {url, title}, passwordHash: string|null } }
 const parties = new Map();
+
+// Hash password using SHA-256
+function hashPassword(password) {
+  if (!password) return null;
+  return crypto.createHash('sha256').update(password).digest('hex');
+}
 
 // Generate a short, human-readable party code
 function generatePartyCode() {
@@ -86,10 +93,12 @@ wss.on('connection', (ws) => {
           // Create a new party
           const partyCode = generatePartyCode();
           username = message.username || 'Anonymous';
+          const passwordHash = hashPassword(message.password);
           
           parties.set(partyCode, {
             participants: new Map([[clientId, { ws, username }]]),
-            video: null
+            video: null,
+            passwordHash: passwordHash
           });
 
           currentPartyCode = partyCode;
@@ -98,6 +107,7 @@ wss.on('connection', (ws) => {
             type: 'party-created',
             partyCode,
             username,
+            hasPassword: !!passwordHash,
             timestamp
           }));
 
@@ -116,6 +126,20 @@ wss.on('connection', (ws) => {
               timestamp
             }));
             break;
+          }
+
+          // Check password if party is password-protected
+          const party = parties.get(joinPartyCode);
+          if (party.passwordHash) {
+            const providedPasswordHash = hashPassword(message.password);
+            if (providedPasswordHash !== party.passwordHash) {
+              ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Incorrect password',
+                timestamp
+              }));
+              break;
+            }
           }
 
           // Remove from previous party if any

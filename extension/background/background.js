@@ -223,7 +223,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
 
     case 'create-party':
-      if (sendToServer({ type: 'create-party', username: message.username })) {
+      if (sendToServer({ 
+        type: 'create-party', 
+        username: message.username,
+        password: message.password 
+      })) {
         sendResponse({ success: true });
       } else {
         sendResponse({ success: false, error: 'Not connected' });
@@ -231,7 +235,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
 
     case 'join-party':
-      if (sendToServer({ type: 'join', partyCode: message.partyCode, username: message.username })) {
+      if (sendToServer({ 
+        type: 'join', 
+        partyCode: message.partyCode, 
+        username: message.username,
+        password: message.password
+      })) {
         sendResponse({ success: true });
       } else {
         sendResponse({ success: false, error: 'Not connected' });
