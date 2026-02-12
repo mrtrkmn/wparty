@@ -180,9 +180,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Request available parties from server
   async function loadAvailableParties() {
     try {
-      await chrome.runtime.sendMessage({ type: 'list-parties' });
+      const response = await chrome.runtime.sendMessage({ type: 'list-parties' });
+      if (!response || !response.success) {
+        updateAvailableParties([]);
+      }
     } catch (error) {
       console.error('Error loading parties:', error);
+      updateAvailableParties([]);
     }
   }
 

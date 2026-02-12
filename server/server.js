@@ -55,6 +55,7 @@ function broadcastToAllInParty(partyCode, message) {
 function getAvailableParties() {
   const result = [];
   for (const [code, party] of parties.entries()) {
+    if (party.participants.size === 0) continue;
     result.push({
       partyCode: code,
       participantCount: party.participants.size,
