@@ -26,7 +26,7 @@
   // Detect if an advertisement is currently playing
   function isAdPlaying() {
     // YouTube: the player gets an 'ad-showing' class during ads
-    const ytPlayer = document.querySelector('#movie_player.ad-showing, .ad-showing .html5-main-video');
+    const ytPlayer = document.querySelector('#movie_player.ad-showing, #movie_player.ad-showing .html5-main-video');
     if (ytPlayer) return true;
 
     // YouTube: ad overlay or ad module visible
@@ -196,7 +196,7 @@
     const currentUrl = window.location.href;
     lastSentVideoUrl = currentUrl;
     currentVideoUrl = currentUrl;
-    updateOverlayUrl(currentVideoUrl);
+    updateOverlayUrl(currentUrl);
 
     const videoInfo = {
       url: currentUrl,
