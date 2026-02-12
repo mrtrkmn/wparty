@@ -25,7 +25,8 @@
 
   // Detect if the current site is Netflix (DRM-protected, requires special handling)
   function isNetflix() {
-    return window.location.hostname.includes('netflix.com');
+    const hostname = window.location.hostname;
+    return hostname === 'netflix.com' || hostname.endsWith('.netflix.com');
   }
 
   // Find Netflix's play/pause button and simulate a click to toggle playback.
