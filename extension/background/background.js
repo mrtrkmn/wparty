@@ -5,6 +5,7 @@ let ws = null;
 let reconnectAttempts = 0;
 let reconnectTimeout = null;
 let heartbeatInterval = null;
+let videoTabId = null; // Track the tab that has the video
 const MAX_RECONNECT_DELAY = 30000; // 30 seconds
 const HEARTBEAT_INTERVAL = 25000; // 25 seconds
 
@@ -83,6 +84,8 @@ async function connect() {
           case 'participants':
             chrome.storage.local.set({ participants: message.participants });
             chrome.runtime.sendMessage({ type: 'participants', data: message }).catch(() => {});
+            // Forward to content script so it can update in-page overlay
+            notifyContentScript({ type: 'participants', data: message });
             break;
 
           case 'sync':
@@ -93,6 +96,8 @@ async function connect() {
           case 'video-info':
             chrome.storage.local.set({ videoInfo: message.data });
             chrome.runtime.sendMessage({ type: 'video-info', data: message }).catch(() => {});
+            // Forward to content script so it knows the party's video URL
+            notifyContentScript({ type: 'video-info', data: message });
             break;
 
           case 'error':
@@ -193,9 +198,21 @@ function sendToServer(message) {
   }
 }
 
-// Notify content script in active tab
+// Notify content script in the video tab (or active tab as fallback)
 async function notifyContentScript(message) {
   try {
+    // Try the tracked video tab first
+    if (videoTabId) {
+      try {
+        await chrome.tabs.sendMessage(videoTabId, message);
+        return;
+      } catch (error) {
+        console.log('Could not send to video tab, trying active tab');
+        videoTabId = null;
+      }
+    }
+
+    // Fall back to active tab
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tabs.length > 0) {
       chrome.tabs.sendMessage(tabs[0].id, message).catch((error) => {
@@ -257,6 +274,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
 
     case 'sync-event':
+      // Track the tab that has the video
+      if (sender.tab) {
+        videoTabId = sender.tab.id;
+      }
       if (sendToServer({ type: 'sync', action: message.action, data: message.data })) {
         sendResponse({ success: true });
       } else {
@@ -265,6 +286,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
 
     case 'video-info':
+      // Track the tab that has the video
+      if (sender.tab) {
+        videoTabId = sender.tab.id;
+      }
       if (sendToServer({ type: 'video-info', data: message.data })) {
         sendResponse({ success: true });
       } else {
