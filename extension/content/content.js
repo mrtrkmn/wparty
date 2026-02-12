@@ -23,14 +23,34 @@
   const PARTY_CODE_PLACEHOLDER = '------';
   let currentVideoUrl = null; // Track the current video URL for overlay display
 
+  // Normalize YouTube URLs so Shorts and regular watch URLs for the same video are equivalent
+  function normalizeYouTubeUrl(url) {
+    try {
+      const parsed = new URL(url);
+      const hostname = parsed.hostname.replace('www.', '');
+      if (hostname !== 'youtube.com') return url;
+
+      // Convert /shorts/VIDEO_ID to /watch?v=VIDEO_ID
+      const shortsMatch = parsed.pathname.match(/^\/shorts\/([a-zA-Z0-9_-]+)/);
+      if (shortsMatch) {
+        parsed.pathname = '/watch';
+        parsed.searchParams.set('v', shortsMatch[1]);
+        return parsed.toString();
+      }
+      return url;
+    } catch (e) {
+      return url;
+    }
+  }
+
   // Detect if an advertisement is currently playing
   function isAdPlaying() {
     // YouTube: the player gets an 'ad-showing' class during ads
     const ytPlayer = document.querySelector('#movie_player.ad-showing, #movie_player.ad-showing .html5-main-video');
     if (ytPlayer) return true;
 
-    // YouTube: ad overlay or ad module visible
-    if (document.querySelector('.ytp-ad-player-overlay, .ytp-ad-module .ytp-ad-text')) return true;
+    // YouTube: ad overlay or ad module visible (regular and Shorts)
+    if (document.querySelector('.ytp-ad-player-overlay, .ytp-ad-module .ytp-ad-text, ytd-reel-video-renderer .ytp-ad-player-overlay')) return true;
 
     // Twitch: pre-roll or mid-roll ad indicators
     if (document.querySelector('[data-a-target="player-ad-overlay"], .player-ad-overlay')) return true;
@@ -46,6 +66,8 @@
     const selectors = [
       'video',                                    // Generic HTML5 video
       '.html5-main-video',                        // YouTube
+      'ytd-shorts video',                         // YouTube Shorts
+      'ytd-reel-video-renderer video',            // YouTube Shorts (alternative)
       'video.vp-video',                           // Vimeo
       'video.vjs-tech',                           // Video.js (used by many sites)
       'video[data-a-player-type="twitch"]',       // Twitch
@@ -168,10 +190,10 @@
     });
   }
 
-  // Handle new video loaded (e.g., YouTube autoplay next, playlist)
+  // Handle new video loaded (e.g., YouTube autoplay next, playlist, Shorts)
   function handleVideoLoaded() {
     if (!isInParty) return;
-    const currentUrl = window.location.href;
+    const currentUrl = normalizeYouTubeUrl(window.location.href);
     if (currentUrl !== lastSentVideoUrl) {
       console.log('Watch Party: New video loaded, sending updated info');
       sendVideoInfo();
@@ -193,7 +215,7 @@
   function sendVideoInfo() {
     if (!videoElement) return;
 
-    const currentUrl = window.location.href;
+    const currentUrl = normalizeYouTubeUrl(window.location.href);
     lastSentVideoUrl = currentUrl;
     currentVideoUrl = currentUrl;
     updateOverlayUrl(currentUrl);
@@ -294,6 +316,10 @@
     // For YouTube, look for #movie_player or #player-container
     const ytPlayer = document.querySelector('#movie_player') || document.querySelector('#player-container-inner');
     if (ytPlayer && ytPlayer.contains(video)) return ytPlayer;
+
+    // For YouTube Shorts, look for the reel renderer or shorts container
+    const ytShorts = document.querySelector('ytd-reel-video-renderer') || document.querySelector('#shorts-container');
+    if (ytShorts && ytShorts.contains(video)) return ytShorts;
 
     // For other platforms, walk up a few levels
     for (let i = 0; i < 5 && container; i++) {
@@ -925,8 +951,8 @@
       case 'video-changed':
         if (message.data && message.data.url) {
           const newUrl = message.data.url;
-          // Only navigate if the URL is different from the current page
-          if (newUrl !== window.location.href) {
+          // Only navigate if the URL is different from the current page (normalize YouTube URLs for comparison)
+          if (newUrl !== normalizeYouTubeUrl(window.location.href)) {
             console.log('Watch Party: Video changed by ' + (message.username || 'participant') + ', navigating to:', newUrl);
             window.location.href = newUrl;
           }
