@@ -48,8 +48,9 @@ async function connect() {
       // Start heartbeat
       startHeartbeat();
       
-      // Notify popup
+      // Notify popup and content scripts
       chrome.runtime.sendMessage({ type: 'connection-status', status: 'connected' }).catch(() => {});
+      notifyContentScript({ type: 'connection-status', status: 'connected' });
     };
 
     ws.onmessage = (event) => {
@@ -67,6 +68,8 @@ async function connect() {
             });
             // Notify popup
             chrome.runtime.sendMessage({ type: 'party-created', data: message }).catch(() => {});
+            // Notify content script so it can enable theater mode and start syncing
+            notifyContentScript({ type: 'joined', data: { partyCode: message.partyCode, participants: [{ username: message.username }] } });
             // Show badge with 1 participant (the creator)
             updateBadge(1);
             break;
@@ -123,11 +126,6 @@ async function connect() {
             chrome.runtime.sendMessage({ type: 'error', message: message.message }).catch(() => {});
             break;
 
-          case 'chat':
-            // Forward chat message to popup
-            chrome.runtime.sendMessage({ type: 'chat', data: message }).catch(() => {});
-            break;
-
           case 'pong':
             // Heartbeat response received
             break;
@@ -149,6 +147,7 @@ async function connect() {
       console.log('WebSocket closed');
       chrome.storage.local.set({ connectionStatus: 'disconnected' });
       chrome.runtime.sendMessage({ type: 'connection-status', status: 'disconnected' }).catch(() => {});
+      notifyContentScript({ type: 'connection-status', status: 'disconnected' });
       
       stopHeartbeat();
       scheduleReconnect();
@@ -218,26 +217,54 @@ function sendToServer(message) {
   }
 }
 
-// Notify content script in the video tab (or active tab as fallback)
+// Notify content script in the video tab and all candidate tabs
 async function notifyContentScript(message) {
   try {
+    const sentTabs = new Set();
+
     // Try the tracked video tab first
     if (videoTabId) {
       try {
         await chrome.tabs.sendMessage(videoTabId, message);
-        return;
+        sentTabs.add(videoTabId);
       } catch (error) {
-        console.log('Could not send to video tab, trying active tab');
+        console.log('Could not send to video tab, clearing tracked tab');
         videoTabId = null;
       }
     }
 
-    // Fall back to active tab
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tabs.length > 0) {
-      chrome.tabs.sendMessage(tabs[0].id, message).catch((error) => {
-        console.log('Could not send message to content script:', error);
-      });
+    // Also send to active tab in current window as fallback
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      for (const tab of tabs) {
+        if (!sentTabs.has(tab.id)) {
+          try {
+            await chrome.tabs.sendMessage(tab.id, message);
+            sentTabs.add(tab.id);
+          } catch (error) {
+            // Content script not loaded in this tab
+          }
+        }
+      }
+    } catch (error) {
+      // Ignore query errors
+    }
+
+    // Also try active tabs in all windows for cross-window support
+    try {
+      const allTabs = await chrome.tabs.query({ active: true });
+      for (const tab of allTabs) {
+        if (!sentTabs.has(tab.id)) {
+          try {
+            await chrome.tabs.sendMessage(tab.id, message);
+            sentTabs.add(tab.id);
+          } catch (error) {
+            // Content script not loaded in this tab
+          }
+        }
+      }
+    } catch (error) {
+      // Ignore query errors
     }
   } catch (error) {
     console.log('Error notifying content script:', error);
@@ -311,14 +338,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         videoTabId = sender.tab.id;
       }
       if (sendToServer({ type: 'video-info', data: message.data })) {
-        sendResponse({ success: true });
-      } else {
-        sendResponse({ success: false, error: 'Not connected' });
-      }
-      break;
-
-    case 'send-chat':
-      if (sendToServer({ type: 'chat', message: message.message })) {
         sendResponse({ success: true });
       } else {
         sendResponse({ success: false, error: 'Not connected' });

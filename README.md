@@ -9,7 +9,6 @@ A Chrome extension that synchronizes video playback across multiple participants
 - 🌐 **Multiple Platform Support**: Works with YouTube, Vimeo, Dailymotion, Twitch, Netflix, Amazon Prime Video, Disney+, and any HTML5 video
 - 🔒 **Private Parties**: Create and join parties with unique 6-character codes
 - 🔐 **Password Protection**: Optional password protection for parties
-- 💬 **Text Chat**: Real-time text messaging between participants
 - 🏠 **Persistent Rooms**: Optional 24-hour persistence for party rooms
 - 👥 **Participant List**: See who's watching with you
 - 🎨 **Modern UI**: Beautiful dark-themed interface
@@ -258,11 +257,9 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ## Future Enhancements
 
-- [x] Text chat functionality ✅
 - [x] Password-protected parties ✅
 - [x] Persistent party rooms ✅
 - [x] More streaming platform support (Netflix, Amazon Prime Video, Disney+) ✅
-- [ ] Video chat integration
 - [ ] Mobile app support
 - [ ] Browser extension for Firefox and Edge
 

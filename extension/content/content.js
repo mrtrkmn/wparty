@@ -7,32 +7,32 @@
   let videoElement = null;
   let isSyncing = false; // Flag to prevent sync loops
   let isInParty = false;
+  let currentPartyCode = null; // Track the current party code
   let lastSyncTime = 0;
   let lastKnownUrl = window.location.href; // Track URL for SPA navigation
   let overlayElement = null; // In-page participant overlay
-  let overlayShadow = null; // Shadow root reference (closed mode returns null from .shadowRoot)
+  let overlayShadow = null; // Shadow root reference
   let overlayCollapsed = false; // Track collapsed state
   let dragMoveHandler = null; // Track drag handlers for cleanup
   let dragUpHandler = null;
-  let originalTitle = null; // Store original page title for restoration
-  const SYNC_COOLDOWN = 500; // Minimum time between sync events in ms
-  const TIME_DRIFT_TOLERANCE = 2; // Only sync if time difference > 2 seconds
+  let theaterModeActive = false; // Track theater mode state
+  let hiddenElements = []; // Elements hidden by theater mode
+  const SYNC_COOLDOWN = 300; // Minimum time between sync events in ms
+  const TIME_DRIFT_TOLERANCE = 1; // Only sync if time difference > 1 second
+  const PARTY_CODE_PLACEHOLDER = '------';
 
   // Detect video element on the page
   function detectVideo() {
-    // Try common video selectors for different platforms
-    // Note: Streaming platform selectors (Netflix, Prime Video, Disney+) may change
-    // as these services update their players. These selectors were verified as of 2024.
     const selectors = [
       'video',                                    // Generic HTML5 video
       '.html5-main-video',                        // YouTube
       'video.vp-video',                           // Vimeo
       'video.vjs-tech',                           // Video.js (used by many sites)
       'video[data-a-player-type="twitch"]',       // Twitch
-      'video[data-uia="video-player"]',           // Netflix (primary selector)
+      'video[data-uia="video-player"]',           // Netflix
       '.dv-player-fullscreen video',              // Amazon Prime Video
       'video.btm-video-player',                   // Disney+
-      '.rendererContainer video',                 // Netflix (alternative selector)
+      '.rendererContainer video',                 // Netflix (alternative)
       '#dv-web-player video'                      // Amazon Prime Video (alternative)
     ];
 
@@ -51,14 +51,16 @@
     videoElement = detectVideo();
     
     if (!videoElement) {
-      // Retry after a short delay (some sites load videos dynamically)
       setTimeout(initVideo, 1000);
       return;
     }
 
     console.log('Watch Party: Video element detected');
     attachVideoListeners();
-    sendVideoInfo();
+    if (isInParty) {
+      sendVideoInfo();
+      enableTheaterMode();
+    }
   }
 
   // Attach event listeners to video element
@@ -179,10 +181,11 @@
     try {
       switch (action) {
         case 'play':
-          // Check time drift and sync if needed
-          const timeDiff = Math.abs(videoElement.currentTime - data.currentTime);
-          if (timeDiff > TIME_DRIFT_TOLERANCE) {
-            videoElement.currentTime = data.currentTime;
+          if (data.currentTime !== undefined) {
+            const timeDiff = Math.abs(videoElement.currentTime - data.currentTime);
+            if (timeDiff > TIME_DRIFT_TOLERANCE) {
+              videoElement.currentTime = data.currentTime;
+            }
           }
           
           if (data.playbackRate && videoElement.playbackRate !== data.playbackRate) {
@@ -197,8 +200,11 @@
           break;
 
         case 'pause':
-          if (Math.abs(videoElement.currentTime - data.currentTime) > TIME_DRIFT_TOLERANCE) {
-            videoElement.currentTime = data.currentTime;
+          if (data.currentTime !== undefined) {
+            const timeDiff = Math.abs(videoElement.currentTime - data.currentTime);
+            if (timeDiff > TIME_DRIFT_TOLERANCE) {
+              videoElement.currentTime = data.currentTime;
+            }
           }
           
           if (!videoElement.paused) {
@@ -207,14 +213,20 @@
           break;
 
         case 'seek':
-          if (Math.abs(videoElement.currentTime - data.currentTime) > TIME_DRIFT_TOLERANCE) {
+          if (data.currentTime !== undefined) {
             videoElement.currentTime = data.currentTime;
           }
           break;
 
         case 'ratechange':
-          if (videoElement.playbackRate !== data.playbackRate) {
+          if (data.playbackRate !== undefined && videoElement.playbackRate !== data.playbackRate) {
             videoElement.playbackRate = data.playbackRate;
+          }
+          if (data.currentTime !== undefined) {
+            const timeDiff = Math.abs(videoElement.currentTime - data.currentTime);
+            if (timeDiff > TIME_DRIFT_TOLERANCE) {
+              videoElement.currentTime = data.currentTime;
+            }
           }
           break;
       }
@@ -223,21 +235,149 @@
     } catch (error) {
       console.error('Watch Party: Error applying sync event:', error);
     } finally {
-      // Reset syncing flag after a short delay
+      // Reset syncing flag after a short delay to let event handlers settle
       setTimeout(() => {
         isSyncing = false;
-      }, 100);
+      }, SYNC_COOLDOWN);
     }
   }
 
-  // Create in-page participant overlay
+  // ============================================================
+  // Theater Mode: hide all elements except the video
+  // ============================================================
+
+  function findVideoContainer(video) {
+    // Walk up to find the best container that wraps the video player
+    let container = video.parentElement;
+    
+    // For YouTube, look for #movie_player or #player-container
+    const ytPlayer = document.querySelector('#movie_player') || document.querySelector('#player-container-inner');
+    if (ytPlayer && ytPlayer.contains(video)) return ytPlayer;
+
+    // For other platforms, walk up a few levels
+    for (let i = 0; i < 5 && container; i++) {
+      const rect = container.getBoundingClientRect();
+      // If the container is reasonably large (at least 300x200), use it
+      if (rect.width >= 300 && rect.height >= 200) {
+        return container;
+      }
+      container = container.parentElement;
+    }
+
+    // Fallback to video's direct parent
+    return video.parentElement;
+  }
+
+  function enableTheaterMode() {
+    if (theaterModeActive || !videoElement) return;
+    theaterModeActive = true;
+    hiddenElements = [];
+
+    const videoContainer = findVideoContainer(videoElement);
+    if (!videoContainer) return;
+
+    // Find the body-level ancestor that contains the video
+    let bodyChild = videoContainer;
+    while (bodyChild.parentElement && bodyChild.parentElement !== document.body && bodyChild.parentElement !== document.documentElement) {
+      bodyChild = bodyChild.parentElement;
+    }
+
+    // Mark the body-level ancestor so CSS can exclude it from hiding
+    if (bodyChild && bodyChild.parentElement === document.body) {
+      bodyChild.setAttribute('data-wparty-keep', '');
+      hiddenElements.push({ el: bodyChild, attr: 'data-wparty-keep' });
+    }
+
+    // Create a style element that hides everything except the video branch and the overlay
+    const styleEl = document.createElement('style');
+    styleEl.id = 'wparty-theater-style';
+    styleEl.textContent = `
+      body > *:not(#wparty-overlay):not([data-wparty-keep]) {
+        display: none !important;
+      }
+      #wparty-overlay {
+        display: block !important;
+      }
+    `;
+    document.head.appendChild(styleEl);
+
+    // Position the video container fixed and fullscreen
+    videoContainer.dataset.wpartyOriginalStyle = videoContainer.getAttribute('style') || '';
+    videoContainer.style.cssText = `
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 2147483646 !important;
+      background: #000 !important;
+    `;
+
+    videoElement.dataset.wpartyOriginalStyle = videoElement.getAttribute('style') || '';
+    videoElement.style.cssText += `
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: contain !important;
+    `;
+
+    // Ensure the video container's ancestors are visible
+    let ancestor = videoContainer.parentElement;
+    while (ancestor && ancestor !== document.body && ancestor !== document.documentElement) {
+      const origDisplay = window.getComputedStyle(ancestor).display;
+      ancestor.dataset.wpartyOrigDisplay = origDisplay;
+      ancestor.style.setProperty('display', 'block', 'important');
+      hiddenElements.push({ el: ancestor, restore: 'display', value: origDisplay });
+      ancestor = ancestor.parentElement;
+    }
+
+    console.log('Watch Party: Theater mode enabled');
+  }
+
+  function disableTheaterMode() {
+    if (!theaterModeActive) return;
+    theaterModeActive = false;
+
+    // Remove theater style
+    const styleEl = document.getElementById('wparty-theater-style');
+    if (styleEl) styleEl.remove();
+
+    // Restore video container styles
+    if (videoElement) {
+      const container = findVideoContainer(videoElement);
+      if (container && container.dataset.wpartyOriginalStyle !== undefined) {
+        container.setAttribute('style', container.dataset.wpartyOriginalStyle);
+        delete container.dataset.wpartyOriginalStyle;
+      }
+      if (videoElement.dataset.wpartyOriginalStyle !== undefined) {
+        videoElement.setAttribute('style', videoElement.dataset.wpartyOriginalStyle);
+        delete videoElement.dataset.wpartyOriginalStyle;
+      }
+    }
+
+    // Restore hidden/modified elements
+    for (const item of hiddenElements) {
+      if (item.attr) {
+        item.el.removeAttribute(item.attr);
+      } else if (item.restore === 'display') {
+        item.el.style.display = item.value;
+        delete item.el.dataset.wpartyOrigDisplay;
+      }
+    }
+    hiddenElements = [];
+
+    console.log('Watch Party: Theater mode disabled');
+  }
+
+  // ============================================================
+  // Participant Overlay
+  // ============================================================
+
   function createOverlay() {
     if (overlayElement) return;
 
     overlayElement = document.createElement('div');
     overlayElement.id = 'wparty-overlay';
 
-    // Use Shadow DOM to isolate styles from the host page
     const shadow = overlayElement.attachShadow({ mode: 'closed' });
     overlayShadow = shadow;
 
@@ -252,6 +392,7 @@
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         font-size: 13px;
         line-height: 1.4;
+        display: block !important;
       }
       .wparty-panel {
         background: rgba(30, 30, 46, 0.92);
@@ -284,6 +425,21 @@
         font-size: 12px;
         color: #fff;
       }
+      .wparty-status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        background: #6b7280;
+      }
+      .wparty-status-dot.connected {
+        background: #22c55e;
+        box-shadow: 0 0 5px rgba(34, 197, 94, 0.5);
+      }
+      .wparty-status-dot.disconnected {
+        background: #ef4444;
+        box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+      }
       .wparty-toggle {
         background: none;
         border: none;
@@ -302,6 +458,37 @@
       }
       .wparty-body.collapsed {
         display: none;
+      }
+      .wparty-party-code {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        margin-bottom: 6px;
+        background: rgba(99, 102, 241, 0.15);
+        border-radius: 6px;
+        font-size: 11px;
+        color: #c4b5fd;
+      }
+      .wparty-party-code-value {
+        font-family: monospace;
+        font-weight: 700;
+        font-size: 13px;
+        color: #a78bfa;
+        letter-spacing: 1px;
+      }
+      .wparty-party-code-copy {
+        background: none;
+        border: none;
+        color: #c4b5fd;
+        cursor: pointer;
+        font-size: 12px;
+        padding: 0 2px;
+        opacity: 0.7;
+        margin-left: auto;
+      }
+      .wparty-party-code-copy:hover {
+        opacity: 1;
       }
       .wparty-participant {
         display: flex;
@@ -360,7 +547,15 @@
 
     const headerLeft = document.createElement('div');
     headerLeft.className = 'wparty-header-left';
-    headerLeft.innerHTML = '<span>🎬</span><span>Watch Party</span>';
+
+    const statusDot = document.createElement('span');
+    statusDot.className = 'wparty-status-dot';
+    statusDot.title = 'Connection status';
+    headerLeft.appendChild(statusDot);
+
+    const titleSpan = document.createElement('span');
+    titleSpan.textContent = 'Watch Party';
+    headerLeft.appendChild(titleSpan);
 
     const countBadge = document.createElement('span');
     countBadge.className = 'wparty-count';
@@ -391,6 +586,39 @@
 
     const body = document.createElement('div');
     body.className = 'wparty-body';
+
+    // Party code section
+    const partyCodeSection = document.createElement('div');
+    partyCodeSection.className = 'wparty-party-code';
+
+    const partyCodeLabel = document.createElement('span');
+    partyCodeLabel.textContent = 'Code:';
+
+    const partyCodeValue = document.createElement('span');
+    partyCodeValue.className = 'wparty-party-code-value';
+    partyCodeValue.textContent = currentPartyCode || PARTY_CODE_PLACEHOLDER;
+
+    const partyCodeCopy = document.createElement('button');
+    partyCodeCopy.className = 'wparty-party-code-copy';
+    partyCodeCopy.textContent = '📋';
+    partyCodeCopy.title = 'Copy party code';
+    partyCodeCopy.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (currentPartyCode) {
+        navigator.clipboard.writeText(currentPartyCode).then(() => {
+          partyCodeCopy.textContent = '✓';
+          setTimeout(() => { partyCodeCopy.textContent = '📋'; }, 1500);
+        }).catch(() => {
+          partyCodeCopy.textContent = '✗';
+          setTimeout(() => { partyCodeCopy.textContent = '📋'; }, 1500);
+        });
+      }
+    });
+
+    partyCodeSection.appendChild(partyCodeLabel);
+    partyCodeSection.appendChild(partyCodeValue);
+    partyCodeSection.appendChild(partyCodeCopy);
+    body.appendChild(partyCodeSection);
 
     panel.appendChild(header);
     panel.appendChild(body);
@@ -458,7 +686,16 @@
     if (!body || !countBadge) return;
 
     countBadge.textContent = participants.length;
-    body.innerHTML = '';
+
+    // Remove existing participant rows (but keep the party code section)
+    const existingRows = body.querySelectorAll('.wparty-participant');
+    existingRows.forEach(row => row.remove());
+
+    // Update party code display
+    const codeValue = body.querySelector('.wparty-party-code-value');
+    if (codeValue && currentPartyCode) {
+      codeValue.textContent = currentPartyCode;
+    }
 
     participants.forEach(participant => {
       const row = document.createElement('div');
@@ -498,46 +735,66 @@
     });
   }
 
-  // Update page title with participant count indicator
-  function updateTitleWithCount(count) {
-    if (originalTitle === null) {
-      originalTitle = document.title;
+  // Update connection status indicator in the overlay
+  function updateOverlayConnectionStatus(status) {
+    if (!overlayShadow) return;
+    const dot = overlayShadow.querySelector('.wparty-status-dot');
+    if (!dot) return;
+
+    dot.className = 'wparty-status-dot';
+    if (status === 'connected') {
+      dot.classList.add('connected');
+      dot.title = 'Connected to server';
+    } else {
+      dot.classList.add('disconnected');
+      dot.title = 'Disconnected from server';
     }
-    document.title = `(${count}) 🎬 ${originalTitle}`;
   }
 
-  // Restore original page title
-  function restoreTitle() {
-    if (originalTitle !== null) {
-      document.title = originalTitle;
-      originalTitle = null;
+  // Update party code display in the overlay
+  function updateOverlayPartyCode(code) {
+    if (!overlayShadow) return;
+    const codeValue = overlayShadow.querySelector('.wparty-party-code-value');
+    if (codeValue) {
+      codeValue.textContent = code || PARTY_CODE_PLACEHOLDER;
     }
   }
 
   // Listen for messages from background script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log('Watch Party: Content script received message:', message);
+    console.log('Watch Party: Content script received message:', message.type);
 
     switch (message.type) {
       case 'sync':
-        applySyncEvent(message.data.action, message.data.data);
+        if (message.data) {
+          applySyncEvent(message.data.action, message.data.data || {});
+        }
         break;
 
       case 'joined':
         isInParty = true;
+        if (message.data && message.data.partyCode) {
+          currentPartyCode = message.data.partyCode;
+        }
         console.log('Watch Party: Joined party');
         createOverlay();
-        sendVideoInfo();
+        updateOverlayPartyCode(currentPartyCode);
+        updateOverlayConnectionStatus('connected');
+        if (videoElement) {
+          enableTheaterMode();
+          sendVideoInfo();
+        }
         if (message.data && message.data.participants) {
-          updateTitleWithCount(message.data.participants.length);
+          updateOverlay(message.data.participants);
         }
         break;
 
       case 'left':
         isInParty = false;
+        currentPartyCode = null;
         console.log('Watch Party: Left party');
+        disableTheaterMode();
         removeOverlay();
-        restoreTitle();
         break;
 
       case 'participants':
@@ -545,31 +802,62 @@
           if (isInParty) {
             if (!overlayElement) createOverlay();
             updateOverlay(message.data.participants);
-            updateTitleWithCount(message.data.participants.length);
           }
         }
         break;
 
+      case 'connection-status':
+        updateOverlayConnectionStatus(message.status);
+        break;
+
       case 'video-info':
-        // Party video URL updated by another participant
         if (message.data && message.data.data) {
           console.log('Watch Party: Party video info updated:', message.data.data.url);
         }
         break;
 
       default:
-        console.log('Watch Party: Unknown message type:', message.type);
+        break;
     }
 
     sendResponse({ success: true });
     return true;
   });
 
+  // Check party status on load (in case content script loads after joining)
+  async function checkPartyStatus() {
+    try {
+      const response = await chrome.runtime.sendMessage({ type: 'get-status' });
+      if (response && response.inParty) {
+        isInParty = true;
+        if (response.partyCode) {
+          currentPartyCode = response.partyCode;
+        }
+        createOverlay();
+        updateOverlayPartyCode(currentPartyCode);
+        updateOverlayConnectionStatus(response.connectionStatus || 'disconnected');
+        if (response.participants) {
+          updateOverlay(response.participants);
+        }
+        if (videoElement) {
+          enableTheaterMode();
+          sendVideoInfo();
+        }
+      }
+    } catch (error) {
+      // Extension context may not be ready yet
+    }
+  }
+
   // Initialize when page loads
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initVideo);
+    document.addEventListener('DOMContentLoaded', () => {
+      initVideo();
+      checkPartyStatus();
+    });
   } else {
     initVideo();
+    checkPartyStatus();
   }
 
   // Re-detect video if page changes (for SPAs)
@@ -580,10 +868,24 @@
     }
   });
 
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
+  if (document.body) {
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  } else {
+    // Wait for body to be available before observing
+    const bodyWaiter = new MutationObserver(() => {
+      if (document.body) {
+        bodyWaiter.disconnect();
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true
+        });
+      }
+    });
+    bodyWaiter.observe(document.documentElement, { childList: true });
+  }
 
   // Detect URL changes for SPAs (e.g., YouTube navigation)
   setInterval(() => {
@@ -592,6 +894,8 @@
       console.log('Watch Party: URL changed, re-detecting video');
       detachVideoListeners();
       videoElement = null;
+      // Disable theater mode on navigation - will re-enable when new video found
+      disableTheaterMode();
       initVideo();
     }
   }, 1000);
