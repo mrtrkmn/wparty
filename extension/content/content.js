@@ -23,6 +23,93 @@
   const PARTY_CODE_PLACEHOLDER = '------';
   let currentVideoUrl = null; // Track the current video URL for overlay display
 
+  // Detect if the current site is Netflix (DRM-protected, requires special handling)
+  function isNetflix() {
+    return window.location.hostname.includes('netflix.com');
+  }
+
+  // Find Netflix's play/pause button and simulate a click to toggle playback.
+  // This avoids directly calling .play()/.pause() on the video element which
+  // triggers Netflix's Widevine DRM error M7375.
+  function netflixTogglePlayPause() {
+    // Netflix uses a button with data-uia="control-play-pause-*"
+    const playPauseBtn = document.querySelector('[data-uia="control-play-pause-pause"], [data-uia="control-play-pause-play"], .button-nfplayerPause, .button-nfplayerPlay');
+    if (playPauseBtn) {
+      playPauseBtn.click();
+      return true;
+    }
+
+    // Fallback: simulate a Space key press on the document, which Netflix's
+    // player intercepts to toggle play/pause
+    const target = document.querySelector('.watch-video, .NFPlayer, .VideoContainer') || document;
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', keyCode: 32, bubbles: true }));
+    return true;
+  }
+
+  // Seek on Netflix by dispatching seek commands through the Netflix player API
+  // or simulating user-initiated seek. Direct setting of videoElement.currentTime
+  // can trigger DRM error M7375.
+  function netflixSeek(targetTime) {
+    if (!videoElement) return false;
+
+    // Netflix exposes its player API on the video player's Cadmium interface.
+    // Try to find the Netflix player API via the known accessor.
+    const videoPlayer = netflix_getPlayerAPI();
+    if (videoPlayer) {
+      try {
+        // Netflix API seek uses milliseconds
+        videoPlayer.seek(targetTime * 1000);
+        return true;
+      } catch (e) {
+        console.log('Watch Party: Netflix API seek failed, using fallback');
+      }
+    }
+
+    // Fallback: set currentTime directly. This may work for seek operations
+    // on some Netflix content but could fail on stricter DRM-protected titles.
+    console.log('Watch Party: Netflix API unavailable, falling back to direct seek');
+    videoElement.currentTime = targetTime;
+    return true;
+  }
+
+  // Attempt to get the Netflix player API (Cadmium player)
+  function netflix_getPlayerAPI() {
+    try {
+      const videoPlayerEl = document.querySelector('.NFPlayer, .watch-video--player-view');
+      if (videoPlayerEl) {
+        const sessionId = netflix_getSessionId();
+        if (sessionId && window.netflix && window.netflix.appContext) {
+          const playerApp = window.netflix.appContext.state.playerApp;
+          if (playerApp) {
+            return playerApp.getAPI().videoPlayer.getVideoPlayerBySessionId(sessionId);
+          }
+        }
+      }
+    } catch (e) {
+      // Netflix API not available or structure changed
+    }
+    return null;
+  }
+
+  // Get Netflix session ID from the player
+  function netflix_getSessionId() {
+    try {
+      if (window.netflix && window.netflix.appContext) {
+        const playerApp = window.netflix.appContext.state.playerApp;
+        if (playerApp) {
+          const sessionIds = playerApp.getAPI().videoPlayer.getAllPlayerSessionIds();
+          // Use the last session ID as it corresponds to the most recently created player
+          if (sessionIds && sessionIds.length > 0) {
+            return sessionIds[sessionIds.length - 1];
+          }
+        }
+      }
+    } catch (e) {
+      // Netflix API not available
+    }
+    return null;
+  }
+
   // Normalize YouTube URLs so Shorts and regular watch URLs for the same video are equivalent
   function normalizeYouTubeUrl(url) {
     try {
@@ -240,6 +327,7 @@
     if (isAdPlaying()) return;
 
     isSyncing = true;
+    const onNetflix = isNetflix();
 
     try {
       switch (action) {
@@ -247,18 +335,28 @@
           if (data.currentTime !== undefined) {
             const timeDiff = Math.abs(videoElement.currentTime - data.currentTime);
             if (timeDiff > TIME_DRIFT_TOLERANCE) {
-              videoElement.currentTime = data.currentTime;
+              if (onNetflix) {
+                netflixSeek(data.currentTime);
+              } else {
+                videoElement.currentTime = data.currentTime;
+              }
             }
           }
           
           if (data.playbackRate && videoElement.playbackRate !== data.playbackRate) {
-            videoElement.playbackRate = data.playbackRate;
+            if (!onNetflix) {
+              videoElement.playbackRate = data.playbackRate;
+            }
           }
           
           if (videoElement.paused) {
-            videoElement.play().catch((error) => {
-              console.error('Watch Party: Error playing video:', error);
-            });
+            if (onNetflix) {
+              netflixTogglePlayPause();
+            } else {
+              videoElement.play().catch((error) => {
+                console.error('Watch Party: Error playing video:', error);
+              });
+            }
           }
           break;
 
@@ -266,29 +364,47 @@
           if (data.currentTime !== undefined) {
             const timeDiff = Math.abs(videoElement.currentTime - data.currentTime);
             if (timeDiff > TIME_DRIFT_TOLERANCE) {
-              videoElement.currentTime = data.currentTime;
+              if (onNetflix) {
+                netflixSeek(data.currentTime);
+              } else {
+                videoElement.currentTime = data.currentTime;
+              }
             }
           }
           
           if (!videoElement.paused) {
-            videoElement.pause();
+            if (onNetflix) {
+              netflixTogglePlayPause();
+            } else {
+              videoElement.pause();
+            }
           }
           break;
 
         case 'seek':
           if (data.currentTime !== undefined) {
-            videoElement.currentTime = data.currentTime;
+            if (onNetflix) {
+              netflixSeek(data.currentTime);
+            } else {
+              videoElement.currentTime = data.currentTime;
+            }
           }
           break;
 
         case 'ratechange':
           if (data.playbackRate !== undefined && videoElement.playbackRate !== data.playbackRate) {
-            videoElement.playbackRate = data.playbackRate;
+            if (!onNetflix) {
+              videoElement.playbackRate = data.playbackRate;
+            }
           }
           if (data.currentTime !== undefined) {
             const timeDiff = Math.abs(videoElement.currentTime - data.currentTime);
             if (timeDiff > TIME_DRIFT_TOLERANCE) {
-              videoElement.currentTime = data.currentTime;
+              if (onNetflix) {
+                netflixSeek(data.currentTime);
+              } else {
+                videoElement.currentTime = data.currentTime;
+              }
             }
           }
           break;
