@@ -17,7 +17,7 @@ A Chrome extension that synchronizes video playback across multiple participants
 
 ## Supported Websites
 
-- **YouTube** (youtube.com)
+- **YouTube** (youtube.com, including Shorts)
 - **Vimeo** (vimeo.com)
 - **Dailymotion** (dailymotion.com)
 - **Twitch** (twitch.tv)
