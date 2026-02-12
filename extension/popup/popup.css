@@ -392,6 +392,32 @@ input[type="checkbox"] {
   background: #6b7280;
 }
 
+.session-url-section {
+  background: #374151;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+}
+
+.session-url-section label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.session-url {
+  display: block;
+  color: #a78bfa;
+  font-size: 12px;
+  text-decoration: none;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.session-url:hover {
+  color: #c4b5fd;
+  text-decoration: underline;
+}
+
 .sync-legend {
   display: flex;
   gap: 12px;
