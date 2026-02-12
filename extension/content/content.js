@@ -950,7 +950,7 @@
 
       case 'video-changed':
         if (message.data && message.data.url) {
-          const newUrl = message.data.url;
+          const newUrl = normalizeYouTubeUrl(message.data.url);
           // Only navigate if the URL is different from the current page (normalize YouTube URLs for comparison)
           if (newUrl !== normalizeYouTubeUrl(window.location.href)) {
             console.log('Watch Party: Video changed by ' + (message.username || 'participant') + ', navigating to:', newUrl);
