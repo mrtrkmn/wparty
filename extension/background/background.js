@@ -48,8 +48,9 @@ async function connect() {
       // Start heartbeat
       startHeartbeat();
       
-      // Notify popup
+      // Notify popup and content scripts
       chrome.runtime.sendMessage({ type: 'connection-status', status: 'connected' }).catch(() => {});
+      notifyContentScript({ type: 'connection-status', status: 'connected' });
     };
 
     ws.onmessage = (event) => {
@@ -146,6 +147,7 @@ async function connect() {
       console.log('WebSocket closed');
       chrome.storage.local.set({ connectionStatus: 'disconnected' });
       chrome.runtime.sendMessage({ type: 'connection-status', status: 'disconnected' }).catch(() => {});
+      notifyContentScript({ type: 'connection-status', status: 'disconnected' });
       
       stopHeartbeat();
       scheduleReconnect();

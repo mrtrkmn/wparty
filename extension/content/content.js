@@ -7,6 +7,7 @@
   let videoElement = null;
   let isSyncing = false; // Flag to prevent sync loops
   let isInParty = false;
+  let currentPartyCode = null; // Track the current party code
   let lastSyncTime = 0;
   let lastKnownUrl = window.location.href; // Track URL for SPA navigation
   let overlayElement = null; // In-page participant overlay
@@ -423,6 +424,21 @@
         font-size: 12px;
         color: #fff;
       }
+      .wparty-status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        background: #6b7280;
+      }
+      .wparty-status-dot.connected {
+        background: #22c55e;
+        box-shadow: 0 0 5px rgba(34, 197, 94, 0.5);
+      }
+      .wparty-status-dot.disconnected {
+        background: #ef4444;
+        box-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+      }
       .wparty-toggle {
         background: none;
         border: none;
@@ -441,6 +457,37 @@
       }
       .wparty-body.collapsed {
         display: none;
+      }
+      .wparty-party-code {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        margin-bottom: 6px;
+        background: rgba(99, 102, 241, 0.15);
+        border-radius: 6px;
+        font-size: 11px;
+        color: #c4b5fd;
+      }
+      .wparty-party-code-value {
+        font-family: monospace;
+        font-weight: 700;
+        font-size: 13px;
+        color: #a78bfa;
+        letter-spacing: 1px;
+      }
+      .wparty-party-code-copy {
+        background: none;
+        border: none;
+        color: #c4b5fd;
+        cursor: pointer;
+        font-size: 12px;
+        padding: 0 2px;
+        opacity: 0.7;
+        margin-left: auto;
+      }
+      .wparty-party-code-copy:hover {
+        opacity: 1;
       }
       .wparty-participant {
         display: flex;
@@ -499,7 +546,15 @@
 
     const headerLeft = document.createElement('div');
     headerLeft.className = 'wparty-header-left';
-    headerLeft.innerHTML = '<span>🎬</span><span>Watch Party</span>';
+
+    const statusDot = document.createElement('span');
+    statusDot.className = 'wparty-status-dot';
+    statusDot.title = 'Connection status';
+    headerLeft.appendChild(statusDot);
+
+    const titleSpan = document.createElement('span');
+    titleSpan.textContent = 'Watch Party';
+    headerLeft.appendChild(titleSpan);
 
     const countBadge = document.createElement('span');
     countBadge.className = 'wparty-count';
@@ -530,6 +585,36 @@
 
     const body = document.createElement('div');
     body.className = 'wparty-body';
+
+    // Party code section
+    const partyCodeSection = document.createElement('div');
+    partyCodeSection.className = 'wparty-party-code';
+
+    const partyCodeLabel = document.createElement('span');
+    partyCodeLabel.textContent = 'Code:';
+
+    const partyCodeValue = document.createElement('span');
+    partyCodeValue.className = 'wparty-party-code-value';
+    partyCodeValue.textContent = currentPartyCode || '------';
+
+    const partyCodeCopy = document.createElement('button');
+    partyCodeCopy.className = 'wparty-party-code-copy';
+    partyCodeCopy.textContent = '📋';
+    partyCodeCopy.title = 'Copy party code';
+    partyCodeCopy.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (currentPartyCode) {
+        navigator.clipboard.writeText(currentPartyCode).then(() => {
+          partyCodeCopy.textContent = '✓';
+          setTimeout(() => { partyCodeCopy.textContent = '📋'; }, 1500);
+        }).catch(() => {});
+      }
+    });
+
+    partyCodeSection.appendChild(partyCodeLabel);
+    partyCodeSection.appendChild(partyCodeValue);
+    partyCodeSection.appendChild(partyCodeCopy);
+    body.appendChild(partyCodeSection);
 
     panel.appendChild(header);
     panel.appendChild(body);
@@ -597,7 +682,16 @@
     if (!body || !countBadge) return;
 
     countBadge.textContent = participants.length;
-    body.innerHTML = '';
+
+    // Remove existing participant rows (but keep the party code section)
+    const existingRows = body.querySelectorAll('.wparty-participant');
+    existingRows.forEach(row => row.remove());
+
+    // Update party code display
+    const codeValue = body.querySelector('.wparty-party-code-value');
+    if (codeValue && currentPartyCode) {
+      codeValue.textContent = currentPartyCode;
+    }
 
     participants.forEach(participant => {
       const row = document.createElement('div');
@@ -637,6 +731,31 @@
     });
   }
 
+  // Update connection status indicator in the overlay
+  function updateOverlayConnectionStatus(status) {
+    if (!overlayShadow) return;
+    const dot = overlayShadow.querySelector('.wparty-status-dot');
+    if (!dot) return;
+
+    dot.className = 'wparty-status-dot';
+    if (status === 'connected') {
+      dot.classList.add('connected');
+      dot.title = 'Connected to server';
+    } else {
+      dot.classList.add('disconnected');
+      dot.title = 'Disconnected from server';
+    }
+  }
+
+  // Update party code display in the overlay
+  function updateOverlayPartyCode(code) {
+    if (!overlayShadow) return;
+    const codeValue = overlayShadow.querySelector('.wparty-party-code-value');
+    if (codeValue) {
+      codeValue.textContent = code || '------';
+    }
+  }
+
   // Listen for messages from background script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('Watch Party: Content script received message:', message.type);
@@ -650,8 +769,13 @@
 
       case 'joined':
         isInParty = true;
+        if (message.data && message.data.partyCode) {
+          currentPartyCode = message.data.partyCode;
+        }
         console.log('Watch Party: Joined party');
         createOverlay();
+        updateOverlayPartyCode(currentPartyCode);
+        updateOverlayConnectionStatus('connected');
         if (videoElement) {
           enableTheaterMode();
           sendVideoInfo();
@@ -663,6 +787,7 @@
 
       case 'left':
         isInParty = false;
+        currentPartyCode = null;
         console.log('Watch Party: Left party');
         disableTheaterMode();
         removeOverlay();
@@ -675,6 +800,10 @@
             updateOverlay(message.data.participants);
           }
         }
+        break;
+
+      case 'connection-status':
+        updateOverlayConnectionStatus(message.status);
         break;
 
       case 'video-info':
@@ -697,7 +826,12 @@
       const response = await chrome.runtime.sendMessage({ type: 'get-status' });
       if (response && response.inParty) {
         isInParty = true;
+        if (response.partyCode) {
+          currentPartyCode = response.partyCode;
+        }
         createOverlay();
+        updateOverlayPartyCode(currentPartyCode);
+        updateOverlayConnectionStatus(response.connectionStatus || 'disconnected');
         if (response.participants) {
           updateOverlay(response.participants);
         }
