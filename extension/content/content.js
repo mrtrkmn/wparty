@@ -59,7 +59,6 @@
     attachVideoListeners();
     if (isInParty) {
       sendVideoInfo();
-      enableTheaterMode();
     }
   }
 
@@ -781,7 +780,6 @@
         updateOverlayPartyCode(currentPartyCode);
         updateOverlayConnectionStatus('connected');
         if (videoElement) {
-          enableTheaterMode();
           sendVideoInfo();
         }
         if (message.data && message.data.participants) {
@@ -840,7 +838,6 @@
           updateOverlay(response.participants);
         }
         if (videoElement) {
-          enableTheaterMode();
           sendVideoInfo();
         }
       }
