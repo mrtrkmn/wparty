@@ -14,6 +14,7 @@
   let overlayCollapsed = false; // Track collapsed state
   let dragMoveHandler = null; // Track drag handlers for cleanup
   let dragUpHandler = null;
+  let originalTitle = null; // Store original page title for restoration
   const SYNC_COOLDOWN = 500; // Minimum time between sync events in ms
   const TIME_DRIFT_TOLERANCE = 2; // Only sync if time difference > 2 seconds
 
@@ -497,6 +498,22 @@
     });
   }
 
+  // Update page title with participant count indicator
+  function updateTitleWithCount(count) {
+    if (originalTitle === null) {
+      originalTitle = document.title;
+    }
+    document.title = `(${count}) 🎬 ${originalTitle}`;
+  }
+
+  // Restore original page title
+  function restoreTitle() {
+    if (originalTitle !== null) {
+      document.title = originalTitle;
+      originalTitle = null;
+    }
+  }
+
   // Listen for messages from background script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('Watch Party: Content script received message:', message);
@@ -511,12 +528,16 @@
         console.log('Watch Party: Joined party');
         createOverlay();
         sendVideoInfo();
+        if (message.data && message.data.participants) {
+          updateTitleWithCount(message.data.participants.length);
+        }
         break;
 
       case 'left':
         isInParty = false;
         console.log('Watch Party: Left party');
         removeOverlay();
+        restoreTitle();
         break;
 
       case 'participants':
@@ -524,6 +545,7 @@
           if (isInParty) {
             if (!overlayElement) createOverlay();
             updateOverlay(message.data.participants);
+            updateTitleWithCount(message.data.participants.length);
           }
         }
         break;

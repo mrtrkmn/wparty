@@ -9,6 +9,16 @@ let videoTabId = null; // Track the tab that has the video
 const MAX_RECONNECT_DELAY = 30000; // 30 seconds
 const HEARTBEAT_INTERVAL = 25000; // 25 seconds
 
+// Update the extension icon badge with participant count
+function updateBadge(participantCount) {
+  if (participantCount > 0) {
+    chrome.action.setBadgeText({ text: String(participantCount) });
+    chrome.action.setBadgeBackgroundColor({ color: '#7c3aed' });
+  } else {
+    chrome.action.setBadgeText({ text: '' });
+  }
+}
+
 // Get server URL from storage or use default
 async function getServerUrl() {
   const result = await chrome.storage.local.get(['serverUrl']);
@@ -57,6 +67,8 @@ async function connect() {
             });
             // Notify popup
             chrome.runtime.sendMessage({ type: 'party-created', data: message }).catch(() => {});
+            // Show badge with 1 participant (the creator)
+            updateBadge(1);
             break;
 
           case 'joined':
@@ -69,6 +81,8 @@ async function connect() {
             // Notify popup and content script
             chrome.runtime.sendMessage({ type: 'joined', data: message }).catch(() => {});
             notifyContentScript({ type: 'joined', data: message });
+            // Update badge with participant count
+            updateBadge(message.participants ? message.participants.length : 0);
             break;
 
           case 'left':
@@ -79,6 +93,8 @@ async function connect() {
             });
             chrome.runtime.sendMessage({ type: 'left' }).catch(() => {});
             notifyContentScript({ type: 'left' });
+            // Clear badge when leaving party
+            updateBadge(0);
             break;
 
           case 'participants':
@@ -86,6 +102,8 @@ async function connect() {
             chrome.runtime.sendMessage({ type: 'participants', data: message }).catch(() => {});
             // Forward to content script so it can update in-page overlay
             notifyContentScript({ type: 'participants', data: message });
+            // Update badge with participant count
+            updateBadge(message.participants ? message.participants.length : 0);
             break;
 
           case 'sync':
@@ -152,6 +170,8 @@ function disconnect() {
     clearTimeout(reconnectTimeout);
     reconnectTimeout = null;
   }
+  // Clear badge on disconnect
+  updateBadge(0);
 }
 
 // Schedule reconnection with exponential backoff
