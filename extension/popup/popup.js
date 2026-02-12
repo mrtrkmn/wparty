@@ -29,7 +29,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const participantCount = document.getElementById('participantCount');
   const participantsList = document.getElementById('participantsList');
   const leavePartyBtn = document.getElementById('leavePartyBtn');
-  const theaterModeToggle = document.getElementById('theaterModeToggle');
   const sessionUrlSection = document.getElementById('sessionUrlSection');
   const sessionUrl = document.getElementById('sessionUrl');
 
@@ -123,11 +122,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       sessionUrlSection.style.display = 'none';
     }
-
-    // Load theater mode state
-    chrome.storage.local.get(['theaterMode'], (result) => {
-      theaterModeToggle.checked = result.theaterMode || false;
-    });
 
     // Update participants list
     updateParticipantsList(data.participants || []);
@@ -278,8 +272,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       const response = await chrome.runtime.sendMessage({ type: 'leave-party' });
 
       if (response.success) {
-        await chrome.storage.local.set({ theaterMode: false });
-        theaterModeToggle.checked = false;
         showNotInPartyView();
       } else {
         showError(response.error || 'Failed to leave party');
@@ -306,26 +298,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
       console.error('Error copying to clipboard:', error);
       showError('Failed to copy party code');
-    }
-  });
-
-  // Theater mode toggle
-  theaterModeToggle.addEventListener('change', async () => {
-    const enabled = theaterModeToggle.checked;
-    try {
-      await chrome.storage.local.set({ theaterMode: enabled });
-      // Notify the content script to toggle theater mode
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      for (const tab of tabs) {
-        try {
-          await chrome.tabs.sendMessage(tab.id, { type: 'toggle-theater', enabled: enabled });
-        } catch (e) {
-          // Content script may not be loaded in this tab
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling theater mode:', error);
-      showError('Failed to toggle theater mode');
     }
   });
 
