@@ -57,6 +57,7 @@
     attachVideoListeners();
     if (isInParty) {
       sendVideoInfo();
+      enableTheaterMode();
     }
   }
 
@@ -273,27 +274,24 @@
     const videoContainer = findVideoContainer(videoElement);
     if (!videoContainer) return;
 
-    // Create a style element that hides everything except the video container and the overlay
+    // Find the body-level ancestor that contains the video
+    let bodyChild = videoContainer;
+    while (bodyChild.parentElement && bodyChild.parentElement !== document.body && bodyChild.parentElement !== document.documentElement) {
+      bodyChild = bodyChild.parentElement;
+    }
+
+    // Mark the body-level ancestor so CSS can exclude it from hiding
+    if (bodyChild && bodyChild.parentElement === document.body) {
+      bodyChild.setAttribute('data-wparty-keep', '');
+      hiddenElements.push({ el: bodyChild, attr: 'data-wparty-keep' });
+    }
+
+    // Create a style element that hides everything except the video branch and the overlay
     const styleEl = document.createElement('style');
     styleEl.id = 'wparty-theater-style';
     styleEl.textContent = `
-      body > *:not(#wparty-overlay) {
+      body > *:not(#wparty-overlay):not([data-wparty-keep]) {
         display: none !important;
-      }
-      #wparty-theater-wrapper {
-        display: block !important;
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100vw !important;
-        height: 100vh !important;
-        background: #000 !important;
-        z-index: 2147483646 !important;
-      }
-      #wparty-theater-wrapper video {
-        width: 100% !important;
-        height: 100% !important;
-        object-fit: contain !important;
       }
       #wparty-overlay {
         display: block !important;
@@ -301,14 +299,7 @@
     `;
     document.head.appendChild(styleEl);
 
-    // Create a wrapper that sits at the top of body
-    const wrapper = document.createElement('div');
-    wrapper.id = 'wparty-theater-wrapper';
-    
-    // Clone the video into the wrapper (or move it)
-    // Moving is simpler but may break some players, so we apply styles to make
-    // the existing video cover the full viewport
-    // Instead: position the video container fixed and fullscreen
+    // Position the video container fixed and fullscreen
     videoContainer.dataset.wpartyOriginalStyle = videoContainer.getAttribute('style') || '';
     videoContainer.style.cssText = `
       position: fixed !important;
@@ -333,7 +324,7 @@
       const origDisplay = window.getComputedStyle(ancestor).display;
       ancestor.dataset.wpartyOrigDisplay = origDisplay;
       ancestor.style.setProperty('display', 'block', 'important');
-      hiddenElements.push(ancestor);
+      hiddenElements.push({ el: ancestor, restore: 'display', value: origDisplay });
       ancestor = ancestor.parentElement;
     }
 
@@ -348,10 +339,6 @@
     const styleEl = document.getElementById('wparty-theater-style');
     if (styleEl) styleEl.remove();
 
-    // Remove theater wrapper
-    const wrapper = document.getElementById('wparty-theater-wrapper');
-    if (wrapper) wrapper.remove();
-
     // Restore video container styles
     if (videoElement) {
       const container = findVideoContainer(videoElement);
@@ -365,11 +352,13 @@
       }
     }
 
-    // Restore ancestor display values
-    for (const el of hiddenElements) {
-      if (el.dataset.wpartyOrigDisplay !== undefined) {
-        el.style.display = el.dataset.wpartyOrigDisplay;
-        delete el.dataset.wpartyOrigDisplay;
+    // Restore hidden/modified elements
+    for (const item of hiddenElements) {
+      if (item.attr) {
+        item.el.removeAttribute(item.attr);
+      } else if (item.restore === 'display') {
+        item.el.style.display = item.value;
+        delete item.el.dataset.wpartyOrigDisplay;
       }
     }
     hiddenElements = [];
@@ -741,10 +730,24 @@
     }
   });
 
-  observer.observe(document.body || document.documentElement, {
-    childList: true,
-    subtree: true
-  });
+  if (document.body) {
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  } else {
+    // Wait for body to be available before observing
+    const bodyWaiter = new MutationObserver(() => {
+      if (document.body) {
+        bodyWaiter.disconnect();
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true
+        });
+      }
+    });
+    bodyWaiter.observe(document.documentElement, { childList: true });
+  }
 
   // Detect URL changes for SPAs (e.g., YouTube navigation)
   setInterval(() => {
