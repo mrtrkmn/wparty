@@ -19,6 +19,7 @@
   let hiddenElements = []; // Elements hidden by theater mode
   const SYNC_COOLDOWN = 300; // Minimum time between sync events in ms
   const TIME_DRIFT_TOLERANCE = 1; // Only sync if time difference > 1 second
+  const PARTY_CODE_PLACEHOLDER = '------';
 
   // Detect video element on the page
   function detectVideo() {
@@ -595,7 +596,7 @@
 
     const partyCodeValue = document.createElement('span');
     partyCodeValue.className = 'wparty-party-code-value';
-    partyCodeValue.textContent = currentPartyCode || '------';
+    partyCodeValue.textContent = currentPartyCode || PARTY_CODE_PLACEHOLDER;
 
     const partyCodeCopy = document.createElement('button');
     partyCodeCopy.className = 'wparty-party-code-copy';
@@ -607,7 +608,10 @@
         navigator.clipboard.writeText(currentPartyCode).then(() => {
           partyCodeCopy.textContent = '✓';
           setTimeout(() => { partyCodeCopy.textContent = '📋'; }, 1500);
-        }).catch(() => {});
+        }).catch(() => {
+          partyCodeCopy.textContent = '✗';
+          setTimeout(() => { partyCodeCopy.textContent = '📋'; }, 1500);
+        });
       }
     });
 
@@ -752,7 +756,7 @@
     if (!overlayShadow) return;
     const codeValue = overlayShadow.querySelector('.wparty-party-code-value');
     if (codeValue) {
-      codeValue.textContent = code || '------';
+      codeValue.textContent = code || PARTY_CODE_PLACEHOLDER;
     }
   }
 
