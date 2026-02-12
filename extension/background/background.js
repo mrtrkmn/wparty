@@ -125,11 +125,6 @@ async function connect() {
             chrome.runtime.sendMessage({ type: 'error', message: message.message }).catch(() => {});
             break;
 
-          case 'chat':
-            // Forward chat message to popup
-            chrome.runtime.sendMessage({ type: 'chat', data: message }).catch(() => {});
-            break;
-
           case 'pong':
             // Heartbeat response received
             break;
@@ -341,14 +336,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         videoTabId = sender.tab.id;
       }
       if (sendToServer({ type: 'video-info', data: message.data })) {
-        sendResponse({ success: true });
-      } else {
-        sendResponse({ success: false, error: 'Not connected' });
-      }
-      break;
-
-    case 'send-chat':
-      if (sendToServer({ type: 'chat', message: message.message })) {
         sendResponse({ success: true });
       } else {
         sendResponse({ success: false, error: 'Not connected' });

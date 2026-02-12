@@ -297,27 +297,6 @@ wss.on('connection', (ws) => {
           }
           break;
 
-        case 'chat':
-          // Relay chat message to all participants in the party
-          if (!currentPartyCode) {
-            ws.send(JSON.stringify({
-              type: 'error',
-              message: 'Not in a party',
-              timestamp
-            }));
-            break;
-          }
-
-          broadcastToAllInParty(currentPartyCode, {
-            type: 'chat',
-            username: username,
-            message: message.message,
-            timestamp
-          });
-
-          console.log(`Chat message from ${username} in party ${currentPartyCode}`);
-          break;
-
         case 'ping':
           // Respond to ping
           ws.send(JSON.stringify({
