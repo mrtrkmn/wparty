@@ -10,29 +10,27 @@
   let lastSyncTime = 0;
   let lastKnownUrl = window.location.href; // Track URL for SPA navigation
   let overlayElement = null; // In-page participant overlay
-  let overlayShadow = null; // Shadow root reference (closed mode returns null from .shadowRoot)
+  let overlayShadow = null; // Shadow root reference
   let overlayCollapsed = false; // Track collapsed state
   let dragMoveHandler = null; // Track drag handlers for cleanup
   let dragUpHandler = null;
-  let originalTitle = null; // Store original page title for restoration
-  const SYNC_COOLDOWN = 500; // Minimum time between sync events in ms
-  const TIME_DRIFT_TOLERANCE = 2; // Only sync if time difference > 2 seconds
+  let theaterModeActive = false; // Track theater mode state
+  let hiddenElements = []; // Elements hidden by theater mode
+  const SYNC_COOLDOWN = 300; // Minimum time between sync events in ms
+  const TIME_DRIFT_TOLERANCE = 1; // Only sync if time difference > 1 second
 
   // Detect video element on the page
   function detectVideo() {
-    // Try common video selectors for different platforms
-    // Note: Streaming platform selectors (Netflix, Prime Video, Disney+) may change
-    // as these services update their players. These selectors were verified as of 2024.
     const selectors = [
       'video',                                    // Generic HTML5 video
       '.html5-main-video',                        // YouTube
       'video.vp-video',                           // Vimeo
       'video.vjs-tech',                           // Video.js (used by many sites)
       'video[data-a-player-type="twitch"]',       // Twitch
-      'video[data-uia="video-player"]',           // Netflix (primary selector)
+      'video[data-uia="video-player"]',           // Netflix
       '.dv-player-fullscreen video',              // Amazon Prime Video
       'video.btm-video-player',                   // Disney+
-      '.rendererContainer video',                 // Netflix (alternative selector)
+      '.rendererContainer video',                 // Netflix (alternative)
       '#dv-web-player video'                      // Amazon Prime Video (alternative)
     ];
 
@@ -51,14 +49,15 @@
     videoElement = detectVideo();
     
     if (!videoElement) {
-      // Retry after a short delay (some sites load videos dynamically)
       setTimeout(initVideo, 1000);
       return;
     }
 
     console.log('Watch Party: Video element detected');
     attachVideoListeners();
-    sendVideoInfo();
+    if (isInParty) {
+      sendVideoInfo();
+    }
   }
 
   // Attach event listeners to video element
@@ -179,10 +178,11 @@
     try {
       switch (action) {
         case 'play':
-          // Check time drift and sync if needed
-          const timeDiff = Math.abs(videoElement.currentTime - data.currentTime);
-          if (timeDiff > TIME_DRIFT_TOLERANCE) {
-            videoElement.currentTime = data.currentTime;
+          if (data.currentTime !== undefined) {
+            const timeDiff = Math.abs(videoElement.currentTime - data.currentTime);
+            if (timeDiff > TIME_DRIFT_TOLERANCE) {
+              videoElement.currentTime = data.currentTime;
+            }
           }
           
           if (data.playbackRate && videoElement.playbackRate !== data.playbackRate) {
@@ -197,8 +197,11 @@
           break;
 
         case 'pause':
-          if (Math.abs(videoElement.currentTime - data.currentTime) > TIME_DRIFT_TOLERANCE) {
-            videoElement.currentTime = data.currentTime;
+          if (data.currentTime !== undefined) {
+            const timeDiff = Math.abs(videoElement.currentTime - data.currentTime);
+            if (timeDiff > TIME_DRIFT_TOLERANCE) {
+              videoElement.currentTime = data.currentTime;
+            }
           }
           
           if (!videoElement.paused) {
@@ -207,14 +210,20 @@
           break;
 
         case 'seek':
-          if (Math.abs(videoElement.currentTime - data.currentTime) > TIME_DRIFT_TOLERANCE) {
+          if (data.currentTime !== undefined) {
             videoElement.currentTime = data.currentTime;
           }
           break;
 
         case 'ratechange':
-          if (videoElement.playbackRate !== data.playbackRate) {
+          if (data.playbackRate !== undefined && videoElement.playbackRate !== data.playbackRate) {
             videoElement.playbackRate = data.playbackRate;
+          }
+          if (data.currentTime !== undefined) {
+            const timeDiff = Math.abs(videoElement.currentTime - data.currentTime);
+            if (timeDiff > TIME_DRIFT_TOLERANCE) {
+              videoElement.currentTime = data.currentTime;
+            }
           }
           break;
       }
@@ -223,21 +232,161 @@
     } catch (error) {
       console.error('Watch Party: Error applying sync event:', error);
     } finally {
-      // Reset syncing flag after a short delay
+      // Reset syncing flag after a short delay to let event handlers settle
       setTimeout(() => {
         isSyncing = false;
-      }, 100);
+      }, SYNC_COOLDOWN);
     }
   }
 
-  // Create in-page participant overlay
+  // ============================================================
+  // Theater Mode: hide all elements except the video
+  // ============================================================
+
+  function findVideoContainer(video) {
+    // Walk up to find the best container that wraps the video player
+    let container = video.parentElement;
+    
+    // For YouTube, look for #movie_player or #player-container
+    const ytPlayer = document.querySelector('#movie_player') || document.querySelector('#player-container-inner');
+    if (ytPlayer && ytPlayer.contains(video)) return ytPlayer;
+
+    // For other platforms, walk up a few levels
+    for (let i = 0; i < 5 && container; i++) {
+      const rect = container.getBoundingClientRect();
+      // If the container is reasonably large (at least 300x200), use it
+      if (rect.width >= 300 && rect.height >= 200) {
+        return container;
+      }
+      container = container.parentElement;
+    }
+
+    // Fallback to video's direct parent
+    return video.parentElement;
+  }
+
+  function enableTheaterMode() {
+    if (theaterModeActive || !videoElement) return;
+    theaterModeActive = true;
+    hiddenElements = [];
+
+    const videoContainer = findVideoContainer(videoElement);
+    if (!videoContainer) return;
+
+    // Create a style element that hides everything except the video container and the overlay
+    const styleEl = document.createElement('style');
+    styleEl.id = 'wparty-theater-style';
+    styleEl.textContent = `
+      body > *:not(#wparty-overlay) {
+        display: none !important;
+      }
+      #wparty-theater-wrapper {
+        display: block !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background: #000 !important;
+        z-index: 2147483646 !important;
+      }
+      #wparty-theater-wrapper video {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: contain !important;
+      }
+      #wparty-overlay {
+        display: block !important;
+      }
+    `;
+    document.head.appendChild(styleEl);
+
+    // Create a wrapper that sits at the top of body
+    const wrapper = document.createElement('div');
+    wrapper.id = 'wparty-theater-wrapper';
+    
+    // Clone the video into the wrapper (or move it)
+    // Moving is simpler but may break some players, so we apply styles to make
+    // the existing video cover the full viewport
+    // Instead: position the video container fixed and fullscreen
+    videoContainer.dataset.wpartyOriginalStyle = videoContainer.getAttribute('style') || '';
+    videoContainer.style.cssText = `
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 2147483646 !important;
+      background: #000 !important;
+    `;
+
+    videoElement.dataset.wpartyOriginalStyle = videoElement.getAttribute('style') || '';
+    videoElement.style.cssText += `
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: contain !important;
+    `;
+
+    // Ensure the video container's ancestors are visible
+    let ancestor = videoContainer.parentElement;
+    while (ancestor && ancestor !== document.body && ancestor !== document.documentElement) {
+      const origDisplay = window.getComputedStyle(ancestor).display;
+      ancestor.dataset.wpartyOrigDisplay = origDisplay;
+      ancestor.style.setProperty('display', 'block', 'important');
+      hiddenElements.push(ancestor);
+      ancestor = ancestor.parentElement;
+    }
+
+    console.log('Watch Party: Theater mode enabled');
+  }
+
+  function disableTheaterMode() {
+    if (!theaterModeActive) return;
+    theaterModeActive = false;
+
+    // Remove theater style
+    const styleEl = document.getElementById('wparty-theater-style');
+    if (styleEl) styleEl.remove();
+
+    // Remove theater wrapper
+    const wrapper = document.getElementById('wparty-theater-wrapper');
+    if (wrapper) wrapper.remove();
+
+    // Restore video container styles
+    if (videoElement) {
+      const container = findVideoContainer(videoElement);
+      if (container && container.dataset.wpartyOriginalStyle !== undefined) {
+        container.setAttribute('style', container.dataset.wpartyOriginalStyle);
+        delete container.dataset.wpartyOriginalStyle;
+      }
+      if (videoElement.dataset.wpartyOriginalStyle !== undefined) {
+        videoElement.setAttribute('style', videoElement.dataset.wpartyOriginalStyle);
+        delete videoElement.dataset.wpartyOriginalStyle;
+      }
+    }
+
+    // Restore ancestor display values
+    for (const el of hiddenElements) {
+      if (el.dataset.wpartyOrigDisplay !== undefined) {
+        el.style.display = el.dataset.wpartyOrigDisplay;
+        delete el.dataset.wpartyOrigDisplay;
+      }
+    }
+    hiddenElements = [];
+
+    console.log('Watch Party: Theater mode disabled');
+  }
+
+  // ============================================================
+  // Participant Overlay
+  // ============================================================
+
   function createOverlay() {
     if (overlayElement) return;
 
     overlayElement = document.createElement('div');
     overlayElement.id = 'wparty-overlay';
 
-    // Use Shadow DOM to isolate styles from the host page
     const shadow = overlayElement.attachShadow({ mode: 'closed' });
     overlayShadow = shadow;
 
@@ -252,6 +401,7 @@
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         font-size: 13px;
         line-height: 1.4;
+        display: block !important;
       }
       .wparty-panel {
         background: rgba(30, 30, 46, 0.92);
@@ -498,46 +648,35 @@
     });
   }
 
-  // Update page title with participant count indicator
-  function updateTitleWithCount(count) {
-    if (originalTitle === null) {
-      originalTitle = document.title;
-    }
-    document.title = `(${count}) 🎬 ${originalTitle}`;
-  }
-
-  // Restore original page title
-  function restoreTitle() {
-    if (originalTitle !== null) {
-      document.title = originalTitle;
-      originalTitle = null;
-    }
-  }
-
   // Listen for messages from background script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log('Watch Party: Content script received message:', message);
+    console.log('Watch Party: Content script received message:', message.type);
 
     switch (message.type) {
       case 'sync':
-        applySyncEvent(message.data.action, message.data.data);
+        if (message.data) {
+          applySyncEvent(message.data.action, message.data.data || {});
+        }
         break;
 
       case 'joined':
         isInParty = true;
         console.log('Watch Party: Joined party');
         createOverlay();
-        sendVideoInfo();
+        if (videoElement) {
+          enableTheaterMode();
+          sendVideoInfo();
+        }
         if (message.data && message.data.participants) {
-          updateTitleWithCount(message.data.participants.length);
+          updateOverlay(message.data.participants);
         }
         break;
 
       case 'left':
         isInParty = false;
         console.log('Watch Party: Left party');
+        disableTheaterMode();
         removeOverlay();
-        restoreTitle();
         break;
 
       case 'participants':
@@ -545,31 +684,53 @@
           if (isInParty) {
             if (!overlayElement) createOverlay();
             updateOverlay(message.data.participants);
-            updateTitleWithCount(message.data.participants.length);
           }
         }
         break;
 
       case 'video-info':
-        // Party video URL updated by another participant
         if (message.data && message.data.data) {
           console.log('Watch Party: Party video info updated:', message.data.data.url);
         }
         break;
 
       default:
-        console.log('Watch Party: Unknown message type:', message.type);
+        break;
     }
 
     sendResponse({ success: true });
     return true;
   });
 
+  // Check party status on load (in case content script loads after joining)
+  async function checkPartyStatus() {
+    try {
+      const response = await chrome.runtime.sendMessage({ type: 'get-status' });
+      if (response && response.inParty) {
+        isInParty = true;
+        createOverlay();
+        if (response.participants) {
+          updateOverlay(response.participants);
+        }
+        if (videoElement) {
+          enableTheaterMode();
+          sendVideoInfo();
+        }
+      }
+    } catch (error) {
+      // Extension context may not be ready yet
+    }
+  }
+
   // Initialize when page loads
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initVideo);
+    document.addEventListener('DOMContentLoaded', () => {
+      initVideo();
+      checkPartyStatus();
+    });
   } else {
     initVideo();
+    checkPartyStatus();
   }
 
   // Re-detect video if page changes (for SPAs)
@@ -580,7 +741,7 @@
     }
   });
 
-  observer.observe(document.body, {
+  observer.observe(document.body || document.documentElement, {
     childList: true,
     subtree: true
   });
@@ -592,6 +753,8 @@
       console.log('Watch Party: URL changed, re-detecting video');
       detachVideoListeners();
       videoElement = null;
+      // Disable theater mode on navigation - will re-enable when new video found
+      disableTheaterMode();
       initVideo();
     }
   }, 1000);
