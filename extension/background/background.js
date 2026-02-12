@@ -114,6 +114,13 @@ async function connect() {
             notifyContentScript({ type: 'sync', data: message });
             break;
 
+          case 'video-changed':
+            chrome.storage.local.set({ videoInfo: message.data });
+            chrome.runtime.sendMessage({ type: 'video-info', data: message }).catch(() => {});
+            // Notify content script to navigate to the new video URL
+            notifyContentScript({ type: 'video-changed', data: message.data, username: message.username });
+            break;
+
           case 'video-info':
             chrome.storage.local.set({ videoInfo: message.data });
             chrome.runtime.sendMessage({ type: 'video-info', data: message }).catch(() => {});
@@ -265,6 +272,25 @@ async function notifyContentScript(message) {
       }
     } catch (error) {
       // Ignore query errors
+    }
+
+    // For video-changed messages, also try all tabs to ensure delivery
+    if (message.type === 'video-changed') {
+      try {
+        const allTabs = await chrome.tabs.query({});
+        for (const tab of allTabs) {
+          if (!sentTabs.has(tab.id)) {
+            try {
+              await chrome.tabs.sendMessage(tab.id, message);
+              sentTabs.add(tab.id);
+            } catch (error) {
+              // Content script not loaded in this tab
+            }
+          }
+        }
+      } catch (error) {
+        // Ignore query errors
+      }
     }
   } catch (error) {
     console.log('Error notifying content script:', error);

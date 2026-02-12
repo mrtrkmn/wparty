@@ -302,6 +302,20 @@ input[type="checkbox"] {
   text-overflow: ellipsis;
 }
 
+.video-link {
+  display: inline-block;
+  color: #a78bfa;
+  font-size: 12px;
+  margin-top: 6px;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.video-link:hover {
+  color: #c4b5fd;
+  text-decoration: underline;
+}
+
 .participants-section {
   background: #374151;
   border-radius: 8px;

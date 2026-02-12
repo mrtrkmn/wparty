@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const usernameDisplay = document.getElementById('usernameDisplay');
   const videoInfoSection = document.getElementById('videoInfoSection');
   const videoTitle = document.getElementById('videoTitle');
+  const videoLink = document.getElementById('videoLink');
   const participantCount = document.getElementById('participantCount');
   const participantsList = document.getElementById('participantsList');
   const leavePartyBtn = document.getElementById('leavePartyBtn');
@@ -101,6 +102,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (data.videoInfo && data.videoInfo.title) {
       videoInfoSection.style.display = 'block';
       videoTitle.textContent = data.videoInfo.title;
+      if (data.videoInfo.url) {
+        videoLink.href = data.videoInfo.url;
+        videoLink.style.display = 'inline-block';
+      } else {
+        videoLink.style.display = 'none';
+      }
     } else {
       videoInfoSection.style.display = 'none';
     }
@@ -342,6 +349,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (message.data.data && message.data.data.title) {
           videoInfoSection.style.display = 'block';
           videoTitle.textContent = message.data.data.title;
+          if (message.data.data.url) {
+            videoLink.href = message.data.data.url;
+            videoLink.style.display = 'inline-block';
+          } else {
+            videoLink.style.display = 'none';
+          }
         }
         break;
 
