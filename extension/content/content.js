@@ -922,6 +922,7 @@
         currentPartyCode = null;
         console.log('Watch Party: Left party');
         disableTheaterMode();
+        chrome.storage.local.set({ theaterMode: false });
         removeOverlay();
         break;
 
@@ -959,6 +960,14 @@
         }
         break;
 
+      case 'toggle-theater':
+        if (message.enabled) {
+          enableTheaterMode();
+        } else {
+          disableTheaterMode();
+        }
+        break;
+
       default:
         break;
     }
@@ -984,6 +993,11 @@
         }
         if (videoElement) {
           sendVideoInfo();
+        }
+        // Restore theater mode if it was enabled
+        const stored = await chrome.storage.local.get(['theaterMode']);
+        if (stored.theaterMode && videoElement) {
+          enableTheaterMode();
         }
       }
     } catch (error) {
