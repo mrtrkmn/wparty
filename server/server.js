@@ -272,14 +272,26 @@ wss.on('connection', (ws) => {
           // Update video information for the party
           if (currentPartyCode && parties.has(currentPartyCode)) {
             const party = parties.get(currentPartyCode);
+            const previousUrl = party.video ? party.video.url : null;
+            const newUrl = message.data.url || null;
             party.video = message.data;
             
             // Update this participant's video URL
             const participant = party.participants.get(clientId);
             if (participant) {
-              participant.videoUrl = message.data.url || null;
+              participant.videoUrl = newUrl;
             }
             
+            // If the party video URL changed, notify other participants to navigate
+            if (newUrl && newUrl !== previousUrl) {
+              broadcastToParty(currentPartyCode, {
+                type: 'video-changed',
+                data: message.data,
+                username: username,
+                timestamp
+              }, clientId);
+            }
+
             // Broadcast video info to other participants (sender already has this info)
             broadcastToParty(currentPartyCode, {
               type: 'video-info',

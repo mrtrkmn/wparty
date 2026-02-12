@@ -114,6 +114,13 @@ async function connect() {
             notifyContentScript({ type: 'sync', data: message });
             break;
 
+          case 'video-changed':
+            chrome.storage.local.set({ videoInfo: message.data });
+            chrome.runtime.sendMessage({ type: 'video-info', data: message }).catch(() => {});
+            // Notify content script to navigate to the new video URL
+            notifyContentScript({ type: 'video-changed', data: message.data, username: message.username });
+            break;
+
           case 'video-info':
             chrome.storage.local.set({ videoInfo: message.data });
             chrome.runtime.sendMessage({ type: 'video-info', data: message }).catch(() => {});
