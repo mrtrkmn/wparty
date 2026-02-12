@@ -42,6 +42,11 @@
             <input type="password" id="joinPassword" placeholder="Password (if required)" maxlength="50">
             <button id="joinPartyBtn" class="btn btn-primary">Join Party</button>
           </div>
+
+          <div class="available-parties" id="availablePartiesSection" style="display: none;">
+            <h3>Available Parties <button id="refreshPartiesBtn" class="btn-icon" title="Refresh">🔄</button></h3>
+            <ul id="availablePartiesList" class="parties-list"></ul>
+          </div>
         </div>
 
         <div class="section">

@@ -18,6 +18,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const joinPartyBtn = document.getElementById('joinPartyBtn');
   const serverUrlInput = document.getElementById('serverUrl');
   const saveServerBtn = document.getElementById('saveServerBtn');
+  const availablePartiesSection = document.getElementById('availablePartiesSection');
+  const availablePartiesList = document.getElementById('availablePartiesList');
+  const refreshPartiesBtn = document.getElementById('refreshPartiesBtn');
 
   // In party elements
   const partyCodeDisplay = document.getElementById('partyCodeDisplay');
@@ -173,6 +176,85 @@ document.addEventListener('DOMContentLoaded', async () => {
       errorMessage.style.display = 'none';
     }, 5000);
   }
+
+  // Request available parties from server
+  async function loadAvailableParties() {
+    try {
+      await chrome.runtime.sendMessage({ type: 'list-parties' });
+    } catch (error) {
+      console.error('Error loading parties:', error);
+    }
+  }
+
+  // Update available parties list UI
+  function updateAvailableParties(parties) {
+    availablePartiesList.innerHTML = '';
+
+    if (!parties || parties.length === 0) {
+      availablePartiesSection.style.display = 'block';
+      const msg = document.createElement('li');
+      msg.className = 'no-parties-message';
+      msg.textContent = 'No parties available';
+      availablePartiesList.appendChild(msg);
+      return;
+    }
+
+    availablePartiesSection.style.display = 'block';
+
+    parties.forEach(party => {
+      const li = document.createElement('li');
+      li.title = party.hasPassword ? 'Password required' : 'Click to join';
+
+      const info = document.createElement('div');
+      info.className = 'party-item-info';
+
+      const code = document.createElement('span');
+      code.className = 'party-item-code';
+      code.textContent = party.partyCode;
+
+      const details = document.createElement('span');
+      details.className = 'party-item-details';
+      details.textContent = party.videoTitle || 'No video';
+
+      info.appendChild(code);
+      info.appendChild(details);
+
+      const right = document.createElement('div');
+      right.className = 'party-item-right';
+
+      const count = document.createElement('span');
+      count.className = 'party-item-count';
+      count.textContent = `👤 ${party.participantCount}`;
+
+      right.appendChild(count);
+
+      if (party.hasPassword) {
+        const lock = document.createElement('span');
+        lock.className = 'party-item-lock';
+        lock.textContent = '🔒';
+        right.appendChild(lock);
+      }
+
+      li.appendChild(info);
+      li.appendChild(right);
+
+      li.addEventListener('click', () => {
+        partyCodeInput.value = party.partyCode;
+        if (party.hasPassword) {
+          joinPasswordInput.focus();
+        } else {
+          joinPartyBtn.click();
+        }
+      });
+
+      availablePartiesList.appendChild(li);
+    });
+  }
+
+  // Refresh available parties
+  refreshPartiesBtn.addEventListener('click', () => {
+    loadAvailableParties();
+  });
 
   // Create party
   createPartyBtn.addEventListener('click', async () => {
@@ -375,6 +457,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       case 'error':
         showError(message.message);
         break;
+
+      case 'party-list':
+        updateAvailableParties(message.parties);
+        break;
     }
 
     sendResponse({ success: true });
@@ -388,4 +474,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Initialize UI
   updateUI();
+
+  // Load available parties on popup open
+  loadAvailableParties();
 });

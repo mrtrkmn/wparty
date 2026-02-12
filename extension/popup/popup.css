@@ -462,6 +462,109 @@ input[type="checkbox"] {
   animation: slideIn 0.3s ease-out;
 }
 
+.available-parties {
+  margin-top: 16px;
+}
+
+.available-parties h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.parties-list {
+  list-style: none;
+  max-height: 180px;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+
+.parties-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.parties-list::-webkit-scrollbar-track {
+  background: #2d2d44;
+  border-radius: 3px;
+}
+
+.parties-list::-webkit-scrollbar-thumb {
+  background: #6366f1;
+  border-radius: 3px;
+}
+
+.parties-list li {
+  padding: 10px 12px;
+  background: #2d2d44;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #e0e0e0;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.parties-list li:hover {
+  background: #3b3b5c;
+}
+
+.parties-list li:last-child {
+  margin-bottom: 0;
+}
+
+.party-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.party-item-code {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  font-size: 13px;
+  color: #a78bfa;
+  letter-spacing: 1px;
+}
+
+.party-item-details {
+  font-size: 11px;
+  color: #9ca3af;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.party-item-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.party-item-count {
+  font-size: 11px;
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 8px;
+  padding: 2px 8px;
+}
+
+.party-item-lock {
+  font-size: 12px;
+}
+
+.no-parties-message {
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+  padding: 12px 0;
+}
+
 @keyframes slideIn {
   from {
     opacity: 0;

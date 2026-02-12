@@ -51,6 +51,21 @@ function broadcastToAllInParty(partyCode, message) {
   });
 }
 
+// Get list of available parties (non-empty, visible to new joiners)
+function getAvailableParties() {
+  const result = [];
+  for (const [code, party] of parties.entries()) {
+    result.push({
+      partyCode: code,
+      participantCount: party.participants.size,
+      hasPassword: !!party.passwordHash,
+      persistent: party.persistent,
+      videoTitle: party.video ? party.video.title : null
+    });
+  }
+  return result;
+}
+
 // Get list of participants in a party with sync status
 function getParticipantList(partyCode) {
   const party = parties.get(partyCode);
@@ -313,6 +328,15 @@ wss.on('connection', (ws) => {
           // Respond to ping
           ws.send(JSON.stringify({
             type: 'pong',
+            timestamp
+          }));
+          break;
+
+        case 'list-parties':
+          // Return list of available parties
+          ws.send(JSON.stringify({
+            type: 'party-list',
+            parties: getAvailableParties(),
             timestamp
           }));
           break;
