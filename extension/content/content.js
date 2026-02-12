@@ -549,6 +549,9 @@
     }
     hiddenElements = [];
 
+    // Sync overlay toggle
+    updateOverlayTheaterToggle(false);
+
     console.log('Watch Party: Theater mode disabled');
   }
 
@@ -746,6 +749,61 @@
         text-decoration: underline;
         color: #c4b5fd;
       }
+      .wparty-theater-section {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 8px;
+        margin-top: 6px;
+        background: rgba(99, 102, 241, 0.10);
+        border-radius: 6px;
+        font-size: 11px;
+        color: #c4b5fd;
+      }
+      .wparty-theater-label {
+        font-size: 11px;
+        color: #c4b5fd;
+      }
+      .wparty-theater-toggle {
+        position: relative;
+        width: 32px;
+        height: 18px;
+        flex-shrink: 0;
+      }
+      .wparty-theater-toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        position: absolute;
+      }
+      .wparty-theater-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #4b5563;
+        border-radius: 18px;
+        transition: background 0.3s;
+      }
+      .wparty-theater-slider::before {
+        content: '';
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        left: 2px;
+        bottom: 2px;
+        background: #e0e0e0;
+        border-radius: 50%;
+        transition: transform 0.3s;
+      }
+      .wparty-theater-toggle input:checked + .wparty-theater-slider {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      }
+      .wparty-theater-toggle input:checked + .wparty-theater-slider::before {
+        transform: translateX(14px);
+      }
     `;
 
     const panel = document.createElement('div');
@@ -844,6 +902,48 @@
     urlSection.appendChild(urlLabel);
     urlSection.appendChild(urlLink);
     body.appendChild(urlSection);
+
+    // Theater mode toggle section
+    const theaterSection = document.createElement('div');
+    theaterSection.className = 'wparty-theater-section';
+
+    const theaterLabel = document.createElement('span');
+    theaterLabel.className = 'wparty-theater-label';
+    theaterLabel.textContent = '🎭 Theater Mode';
+
+    const theaterToggleWrapper = document.createElement('div');
+    theaterToggleWrapper.className = 'wparty-theater-toggle';
+
+    const theaterCheckbox = document.createElement('input');
+    theaterCheckbox.type = 'checkbox';
+    theaterCheckbox.checked = theaterModeActive;
+    theaterCheckbox.className = 'wparty-theater-checkbox';
+
+    const theaterSlider = document.createElement('span');
+    theaterSlider.className = 'wparty-theater-slider';
+
+    theaterCheckbox.addEventListener('change', (e) => {
+      e.stopPropagation();
+      const enabled = theaterCheckbox.checked;
+      chrome.storage.local.set({ theaterMode: enabled });
+      if (enabled) {
+        enableTheaterMode();
+      } else {
+        disableTheaterMode();
+      }
+    });
+
+    theaterSlider.addEventListener('click', (e) => {
+      e.stopPropagation();
+      theaterCheckbox.checked = !theaterCheckbox.checked;
+      theaterCheckbox.dispatchEvent(new Event('change'));
+    });
+
+    theaterToggleWrapper.appendChild(theaterCheckbox);
+    theaterToggleWrapper.appendChild(theaterSlider);
+    theaterSection.appendChild(theaterLabel);
+    theaterSection.appendChild(theaterToggleWrapper);
+    body.appendChild(theaterSection);
 
     panel.appendChild(header);
     panel.appendChild(body);
@@ -1006,6 +1106,15 @@
     }
   }
 
+  // Update theater mode toggle state in the overlay
+  function updateOverlayTheaterToggle(enabled) {
+    if (!overlayShadow) return;
+    const checkbox = overlayShadow.querySelector('.wparty-theater-checkbox');
+    if (checkbox) {
+      checkbox.checked = enabled;
+    }
+  }
+
   // Listen for messages from background script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('Watch Party: Content script received message:', message.type);
@@ -1039,6 +1148,7 @@
         currentPartyCode = null;
         console.log('Watch Party: Left party');
         disableTheaterMode();
+        chrome.storage.local.set({ theaterMode: false });
         removeOverlay();
         break;
 
@@ -1101,6 +1211,11 @@
         }
         if (videoElement) {
           sendVideoInfo();
+        }
+        // Restore theater mode if it was enabled
+        const stored = await chrome.storage.local.get(['theaterMode']);
+        if (stored.theaterMode && videoElement) {
+          enableTheaterMode();
         }
       }
     } catch (error) {
