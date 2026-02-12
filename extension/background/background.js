@@ -84,6 +84,8 @@ async function connect() {
           case 'participants':
             chrome.storage.local.set({ participants: message.participants });
             chrome.runtime.sendMessage({ type: 'participants', data: message }).catch(() => {});
+            // Forward to content script so it can update in-page overlay
+            notifyContentScript({ type: 'participants', data: message });
             break;
 
           case 'sync':
