@@ -21,6 +21,25 @@
   const SYNC_COOLDOWN = 300; // Minimum time between sync events in ms
   const TIME_DRIFT_TOLERANCE = 1; // Only sync if time difference > 1 second
   const PARTY_CODE_PLACEHOLDER = '------';
+  let currentVideoUrl = null; // Track the current video URL for overlay display
+
+  // Detect if an advertisement is currently playing
+  function isAdPlaying() {
+    // YouTube: the player gets an 'ad-showing' class during ads
+    const ytPlayer = document.querySelector('#movie_player.ad-showing, #movie_player.ad-showing .html5-main-video');
+    if (ytPlayer) return true;
+
+    // YouTube: ad overlay or ad module visible
+    if (document.querySelector('.ytp-ad-player-overlay, .ytp-ad-module .ytp-ad-text')) return true;
+
+    // Twitch: pre-roll or mid-roll ad indicators
+    if (document.querySelector('[data-a-target="player-ad-overlay"], .player-ad-overlay')) return true;
+
+    // Generic: some players use a data attribute or class on the video element
+    if (videoElement && (videoElement.classList.contains('ad-playing') || videoElement.dataset.adPlaying === 'true')) return true;
+
+    return false;
+  }
 
   // Detect video element on the page
   function detectVideo() {
@@ -90,6 +109,7 @@
   // Handle play event
   function handlePlay() {
     if (isSyncing || !isInParty) return;
+    if (isAdPlaying()) return;
     
     const now = Date.now();
     if (now - lastSyncTime < SYNC_COOLDOWN) return;
@@ -105,6 +125,7 @@
   // Handle pause event
   function handlePause() {
     if (isSyncing || !isInParty) return;
+    if (isAdPlaying()) return;
     
     const now = Date.now();
     if (now - lastSyncTime < SYNC_COOLDOWN) return;
@@ -119,6 +140,7 @@
   // Handle seeked event
   function handleSeeked() {
     if (isSyncing || !isInParty) return;
+    if (isAdPlaying()) return;
     
     const now = Date.now();
     if (now - lastSyncTime < SYNC_COOLDOWN) return;
@@ -133,6 +155,7 @@
   // Handle rate change event
   function handleRateChange() {
     if (isSyncing || !isInParty) return;
+    if (isAdPlaying()) return;
     
     const now = Date.now();
     if (now - lastSyncTime < SYNC_COOLDOWN) return;
@@ -172,6 +195,8 @@
 
     const currentUrl = window.location.href;
     lastSentVideoUrl = currentUrl;
+    currentVideoUrl = currentUrl;
+    updateOverlayUrl(currentUrl);
 
     const videoInfo = {
       url: currentUrl,
@@ -190,6 +215,7 @@
   // Apply sync event from remote participant
   function applySyncEvent(action, data) {
     if (!videoElement) return;
+    if (isAdPlaying()) return;
 
     isSyncing = true;
 
@@ -552,6 +578,31 @@
       .wparty-panel.collapsed-panel {
         min-width: auto;
       }
+      .wparty-url-section {
+        padding: 6px 8px;
+        margin-top: 6px;
+        background: rgba(99, 102, 241, 0.10);
+        border-radius: 6px;
+        font-size: 11px;
+        color: #c4b5fd;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        overflow: hidden;
+      }
+      .wparty-url-section a {
+        color: #a78bfa;
+        text-decoration: none;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+        min-width: 0;
+      }
+      .wparty-url-section a:hover {
+        text-decoration: underline;
+        color: #c4b5fd;
+      }
     `;
 
     const panel = document.createElement('div');
@@ -635,6 +686,22 @@
     partyCodeSection.appendChild(partyCodeCopy);
     body.appendChild(partyCodeSection);
 
+    // URL section
+    const urlSection = document.createElement('div');
+    urlSection.className = 'wparty-url-section';
+    const urlLabel = document.createElement('span');
+    urlLabel.textContent = '🔗';
+    const urlLink = document.createElement('a');
+    urlLink.className = 'wparty-url-link';
+    urlLink.href = currentVideoUrl || window.location.href;
+    urlLink.textContent = currentVideoUrl || window.location.href;
+    urlLink.title = currentVideoUrl || window.location.href;
+    urlLink.target = '_blank';
+    urlLink.rel = 'noopener noreferrer';
+    urlSection.appendChild(urlLabel);
+    urlSection.appendChild(urlLink);
+    body.appendChild(urlSection);
+
     panel.appendChild(header);
     panel.appendChild(body);
     shadow.appendChild(style);
@@ -712,6 +779,15 @@
       codeValue.textContent = currentPartyCode;
     }
 
+    // Update URL display
+    const urlLink = body.querySelector('.wparty-url-link');
+    if (urlLink) {
+      const displayUrl = currentVideoUrl || window.location.href;
+      urlLink.href = displayUrl;
+      urlLink.textContent = displayUrl;
+      urlLink.title = displayUrl;
+    }
+
     participants.forEach(participant => {
       const row = document.createElement('div');
       row.className = 'wparty-participant';
@@ -775,6 +851,18 @@
     }
   }
 
+  // Update URL display in the overlay
+  function updateOverlayUrl(url) {
+    if (!overlayShadow) return;
+    const urlLink = overlayShadow.querySelector('.wparty-url-link');
+    if (urlLink) {
+      const displayUrl = url || window.location.href;
+      urlLink.href = displayUrl;
+      urlLink.textContent = displayUrl;
+      urlLink.title = displayUrl;
+    }
+  }
+
   // Listen for messages from background script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('Watch Party: Content script received message:', message.type);
@@ -827,6 +915,10 @@
       case 'video-info':
         if (message.data && message.data.data) {
           console.log('Watch Party: Party video info updated:', message.data.data.url);
+          if (message.data.data.url) {
+            currentVideoUrl = message.data.data.url;
+            updateOverlayUrl(currentVideoUrl);
+          }
         }
         break;
 

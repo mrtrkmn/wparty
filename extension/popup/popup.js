@@ -29,6 +29,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const participantCount = document.getElementById('participantCount');
   const participantsList = document.getElementById('participantsList');
   const leavePartyBtn = document.getElementById('leavePartyBtn');
+  const sessionUrlSection = document.getElementById('sessionUrlSection');
+  const sessionUrl = document.getElementById('sessionUrl');
 
   // Load saved username from storage
   const savedData = await chrome.storage.local.get(['username', 'serverUrl']);
@@ -110,6 +112,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     } else {
       videoInfoSection.style.display = 'none';
+    }
+
+    // Update session URL
+    if (data.videoInfo && data.videoInfo.url) {
+      sessionUrlSection.style.display = 'block';
+      sessionUrl.href = data.videoInfo.url;
+      sessionUrl.textContent = data.videoInfo.url;
+    } else {
+      sessionUrlSection.style.display = 'none';
     }
 
     // Update participants list
@@ -352,6 +363,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (message.data.data.url) {
             videoLink.href = message.data.data.url;
             videoLink.style.display = 'inline-block';
+            sessionUrlSection.style.display = 'block';
+            sessionUrl.href = message.data.data.url;
+            sessionUrl.textContent = message.data.data.url;
           } else {
             videoLink.style.display = 'none';
           }
