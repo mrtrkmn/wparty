@@ -273,6 +273,25 @@ async function notifyContentScript(message) {
     } catch (error) {
       // Ignore query errors
     }
+
+    // For video-changed messages, also try all tabs to ensure delivery
+    if (message.type === 'video-changed') {
+      try {
+        const allTabs = await chrome.tabs.query({});
+        for (const tab of allTabs) {
+          if (!sentTabs.has(tab.id)) {
+            try {
+              await chrome.tabs.sendMessage(tab.id, message);
+              sentTabs.add(tab.id);
+            } catch (error) {
+              // Content script not loaded in this tab
+            }
+          }
+        }
+      } catch (error) {
+        // Ignore query errors
+      }
+    }
   } catch (error) {
     console.log('Error notifying content script:', error);
   }

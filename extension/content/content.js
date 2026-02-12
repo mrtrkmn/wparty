@@ -10,6 +10,7 @@
   let currentPartyCode = null; // Track the current party code
   let lastSyncTime = 0;
   let lastKnownUrl = window.location.href; // Track URL for SPA navigation
+  let lastSentVideoUrl = null; // Track the last video URL sent to server
   let overlayElement = null; // In-page participant overlay
   let overlayShadow = null; // Shadow root reference
   let overlayCollapsed = false; // Track collapsed state
@@ -70,6 +71,7 @@
     videoElement.addEventListener('pause', handlePause);
     videoElement.addEventListener('seeked', handleSeeked);
     videoElement.addEventListener('ratechange', handleRateChange);
+    videoElement.addEventListener('loadeddata', handleVideoLoaded);
     
     console.log('Watch Party: Video listeners attached');
   }
@@ -82,6 +84,7 @@
     videoElement.removeEventListener('pause', handlePause);
     videoElement.removeEventListener('seeked', handleSeeked);
     videoElement.removeEventListener('ratechange', handleRateChange);
+    videoElement.removeEventListener('loadeddata', handleVideoLoaded);
   }
 
   // Handle play event
@@ -142,6 +145,16 @@
     });
   }
 
+  // Handle new video loaded (e.g., YouTube autoplay next, playlist)
+  function handleVideoLoaded() {
+    if (!isInParty) return;
+    const currentUrl = window.location.href;
+    if (currentUrl !== lastSentVideoUrl) {
+      console.log('Watch Party: New video loaded, sending updated info');
+      sendVideoInfo();
+    }
+  }
+
   // Send sync event to background script
   function sendSyncEvent(action, data) {
     chrome.runtime.sendMessage({
@@ -157,8 +170,11 @@
   function sendVideoInfo() {
     if (!videoElement) return;
 
+    const currentUrl = window.location.href;
+    lastSentVideoUrl = currentUrl;
+
     const videoInfo = {
-      url: window.location.href,
+      url: currentUrl,
       title: document.title,
       duration: videoElement.duration
     };
