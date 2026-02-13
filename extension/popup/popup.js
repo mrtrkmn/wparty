@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const sessionUrl = document.getElementById('sessionUrl');
 
   // Load saved username from storage
-  const savedData = await chrome.storage.local.get(['username', 'serverUrl']);
+  const savedData = await chrome.storage.local.get(['username', 'serverUrl', 'accentHue']);
   if (savedData.username) {
     createUsernameInput.value = savedData.username;
     joinUsernameInput.value = savedData.username;
@@ -46,6 +46,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
     serverUrlInput.value = 'ws://localhost:8080';
   }
+
+  // Accent color slider
+  const accentHueSlider = document.getElementById('accentHueSlider');
+  function applyAccentHue(hue) {
+    document.documentElement.style.setProperty('--accent-hue', hue);
+  }
+  if (savedData.accentHue != null) {
+    accentHueSlider.value = savedData.accentHue;
+    applyAccentHue(savedData.accentHue);
+  }
+  accentHueSlider.addEventListener('input', () => {
+    const hue = accentHueSlider.value;
+    applyAccentHue(hue);
+    chrome.storage.local.set({ accentHue: parseInt(hue, 10) });
+  });
 
   // Update UI based on current status
   async function updateUI() {
