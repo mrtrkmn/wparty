@@ -17,6 +17,7 @@
   let dragMoveHandler = null; // Track drag handlers for cleanup
   let dragUpHandler = null;
   let theaterModeActive = false; // Track theater mode state
+  let grayscaleModeActive = false; // Track grayscale (B&W) mode state
   let hiddenElements = []; // Elements hidden by theater mode
   const SYNC_COOLDOWN = 300; // Minimum time between sync events in ms
   const TIME_DRIFT_TOLERANCE = 1; // Only sync if time difference > 1 second
@@ -577,6 +578,47 @@
   }
 
   // ============================================================
+  // Grayscale (Black & White) Mode
+  // ============================================================
+
+  function enableGrayscaleMode() {
+    if (grayscaleModeActive || !videoElement) return;
+    grayscaleModeActive = true;
+
+    if (!document.getElementById('wparty-grayscale-style')) {
+      const styleEl = document.createElement('style');
+      styleEl.id = 'wparty-grayscale-style';
+      styleEl.textContent = `
+        .wparty-grayscale-video {
+          filter: grayscale(100%) !important;
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
+
+    videoElement.classList.add('wparty-grayscale-video');
+
+    console.log('Watch Party: Grayscale mode enabled');
+  }
+
+  function disableGrayscaleMode() {
+    if (!grayscaleModeActive) return;
+    grayscaleModeActive = false;
+
+    const styleEl = document.getElementById('wparty-grayscale-style');
+    if (styleEl) styleEl.remove();
+
+    if (videoElement) {
+      videoElement.classList.remove('wparty-grayscale-video');
+    }
+
+    // Sync overlay toggle
+    updateOverlayGrayscaleToggle(false);
+
+    console.log('Watch Party: Grayscale mode disabled');
+  }
+
+  // ============================================================
   // Participant Overlay
   // ============================================================
 
@@ -825,6 +867,61 @@
       .wparty-theater-toggle input:checked + .wparty-theater-slider::before {
         transform: translateX(14px);
       }
+      .wparty-grayscale-section {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 8px;
+        margin-top: 6px;
+        background: rgba(99, 102, 241, 0.10);
+        border-radius: 6px;
+        font-size: 11px;
+        color: #c4b5fd;
+      }
+      .wparty-grayscale-label {
+        font-size: 11px;
+        color: #c4b5fd;
+      }
+      .wparty-grayscale-toggle {
+        position: relative;
+        width: 32px;
+        height: 18px;
+        flex-shrink: 0;
+      }
+      .wparty-grayscale-toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        position: absolute;
+      }
+      .wparty-grayscale-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #4b5563;
+        border-radius: 18px;
+        transition: background 0.3s;
+      }
+      .wparty-grayscale-slider::before {
+        content: '';
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        left: 2px;
+        bottom: 2px;
+        background: #e0e0e0;
+        border-radius: 50%;
+        transition: transform 0.3s;
+      }
+      .wparty-grayscale-toggle input:checked + .wparty-grayscale-slider {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      }
+      .wparty-grayscale-toggle input:checked + .wparty-grayscale-slider::before {
+        transform: translateX(14px);
+      }
     `;
 
     const panel = document.createElement('div');
@@ -967,6 +1064,48 @@
     theaterSection.appendChild(theaterLabel);
     theaterSection.appendChild(theaterToggleWrapper);
     body.appendChild(theaterSection);
+
+    // Grayscale (B&W) mode toggle section
+    const grayscaleSection = document.createElement('div');
+    grayscaleSection.className = 'wparty-grayscale-section';
+
+    const grayscaleLabel = document.createElement('span');
+    grayscaleLabel.className = 'wparty-grayscale-label';
+    grayscaleLabel.textContent = '🎞️ Black & White';
+
+    const grayscaleToggleWrapper = document.createElement('div');
+    grayscaleToggleWrapper.className = 'wparty-grayscale-toggle';
+
+    const grayscaleCheckbox = document.createElement('input');
+    grayscaleCheckbox.type = 'checkbox';
+    grayscaleCheckbox.checked = grayscaleModeActive;
+    grayscaleCheckbox.className = 'wparty-grayscale-checkbox';
+
+    const grayscaleSlider = document.createElement('span');
+    grayscaleSlider.className = 'wparty-grayscale-slider';
+
+    grayscaleCheckbox.addEventListener('change', (e) => {
+      e.stopPropagation();
+      const enabled = grayscaleCheckbox.checked;
+      chrome.storage.local.set({ grayscaleMode: enabled });
+      if (enabled) {
+        enableGrayscaleMode();
+      } else {
+        disableGrayscaleMode();
+      }
+    });
+
+    grayscaleSlider.addEventListener('click', (e) => {
+      e.stopPropagation();
+      grayscaleCheckbox.checked = !grayscaleCheckbox.checked;
+      grayscaleCheckbox.dispatchEvent(new Event('change'));
+    });
+
+    grayscaleToggleWrapper.appendChild(grayscaleCheckbox);
+    grayscaleToggleWrapper.appendChild(grayscaleSlider);
+    grayscaleSection.appendChild(grayscaleLabel);
+    grayscaleSection.appendChild(grayscaleToggleWrapper);
+    body.appendChild(grayscaleSection);
 
     panel.appendChild(header);
     panel.appendChild(body);
@@ -1138,6 +1277,14 @@
     }
   }
 
+  function updateOverlayGrayscaleToggle(enabled) {
+    if (!overlayShadow) return;
+    const checkbox = overlayShadow.querySelector('.wparty-grayscale-checkbox');
+    if (checkbox) {
+      checkbox.checked = enabled;
+    }
+  }
+
   // Listen for messages from background script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('Watch Party: Content script received message:', message.type);
@@ -1172,7 +1319,8 @@
         console.log('Watch Party: Left party');
         sendYouTubeTheaterKey();
         disableTheaterMode();
-        chrome.storage.local.set({ theaterMode: false });
+        disableGrayscaleMode();
+        chrome.storage.local.set({ theaterMode: false, grayscaleMode: false });
         removeOverlay();
         break;
 
@@ -1237,10 +1385,14 @@
           sendVideoInfo();
         }
         // Restore theater mode if it was enabled
-        const stored = await chrome.storage.local.get(['theaterMode']);
+        const stored = await chrome.storage.local.get(['theaterMode', 'grayscaleMode']);
         if (stored.theaterMode && videoElement) {
           sendYouTubeTheaterKey();
           enableTheaterMode();
+        }
+        // Restore grayscale mode if it was enabled
+        if (stored.grayscaleMode && videoElement) {
+          enableGrayscaleMode();
         }
       }
     } catch (error) {
