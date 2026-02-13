@@ -137,6 +137,11 @@ async function connect() {
             // Heartbeat response received
             break;
 
+          case 'party-list':
+            // Forward party list to popup
+            chrome.runtime.sendMessage({ type: 'party-list', parties: message.parties }).catch(() => {});
+            break;
+
           default:
             console.log('Unknown message type:', message.type);
         }
@@ -382,6 +387,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
       });
       return true; // Keep channel open for async response
+
+    case 'list-parties':
+      if (sendToServer({ type: 'list-parties' })) {
+        sendResponse({ success: true });
+      } else {
+        sendResponse({ success: false, error: 'Not connected' });
+      }
+      break;
 
     default:
       console.log('Unknown message type:', message.type);

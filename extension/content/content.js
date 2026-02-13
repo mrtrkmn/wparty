@@ -457,61 +457,82 @@
     theaterModeActive = true;
     hiddenElements = [];
 
-    const videoContainer = findVideoContainer(videoElement);
-    if (!videoContainer) return;
-
-    // Find the body-level ancestor that contains the video
-    let bodyChild = videoContainer;
-    while (bodyChild.parentElement && bodyChild.parentElement !== document.body && bodyChild.parentElement !== document.documentElement) {
-      bodyChild = bodyChild.parentElement;
-    }
-
-    // Mark the body-level ancestor so CSS can exclude it from hiding
-    if (bodyChild && bodyChild.parentElement === document.body) {
-      bodyChild.setAttribute('data-wparty-keep', '');
-      hiddenElements.push({ el: bodyChild, attr: 'data-wparty-keep' });
-    }
-
-    // Create a style element that hides everything except the video branch and the overlay
+    // Inject a style element that creates the theater-mode overlay.  A fixed
+    // black backdrop sits beneath the video's ancestor branch.  We then walk
+    // up the DOM from the video to the direct child of <body> and promote
+    // that subtree above the backdrop so the video remains visible.
     const styleEl = document.createElement('style');
     styleEl.id = 'wparty-theater-style';
     styleEl.textContent = `
-      body > *:not(#wparty-overlay):not([data-wparty-keep]) {
-        display: none !important;
-      }
-      #wparty-overlay {
-        display: block !important;
+      #wparty-theater-backdrop {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 2147483644 !important;
+        background: #000 !important;
       }
     `;
     document.head.appendChild(styleEl);
 
-    // Position the video container fixed and fullscreen
-    videoContainer.dataset.wpartyOriginalStyle = videoContainer.getAttribute('style') || '';
-    videoContainer.style.cssText = `
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      z-index: 2147483646 !important;
-      background: #000 !important;
-    `;
+    // Create the backdrop element
+    const backdrop = document.createElement('div');
+    backdrop.id = 'wparty-theater-backdrop';
+    document.documentElement.appendChild(backdrop);
 
-    videoElement.dataset.wpartyOriginalStyle = videoElement.getAttribute('style') || '';
-    videoElement.style.cssText += `
+    // Find the direct child of <body> that contains the video
+    let bodyChild = videoElement;
+    while (bodyChild && bodyChild.parentElement && bodyChild.parentElement !== document.body) {
+      bodyChild = bodyChild.parentElement;
+    }
+
+    // Promote the body-child branch above the backdrop
+    if (bodyChild && bodyChild.parentElement === document.body) {
+      const orig = bodyChild.getAttribute('style') || '';
+      bodyChild.dataset.wpartyOrigStyle = orig;
+      hiddenElements.push(bodyChild);
+      bodyChild.style.cssText = orig + `;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 2147483645 !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        transform: none !important;
+        max-width: none !important;
+        max-height: none !important;
+      `;
+    }
+
+    // Make the video fill its promoted container
+    const origVideo = videoElement.getAttribute('style') || '';
+    videoElement.dataset.wpartyOrigStyle = origVideo;
+    hiddenElements.push(videoElement);
+    videoElement.style.cssText = origVideo + `;
       width: 100% !important;
       height: 100% !important;
       object-fit: contain !important;
+      background: #000 !important;
     `;
 
-    // Ensure the video container's ancestors are visible
-    let ancestor = videoContainer.parentElement;
-    while (ancestor && ancestor !== document.body && ancestor !== document.documentElement) {
-      const origDisplay = window.getComputedStyle(ancestor).display;
-      ancestor.dataset.wpartyOrigDisplay = origDisplay;
-      ancestor.style.setProperty('display', 'block', 'important');
-      hiddenElements.push({ el: ancestor, restore: 'display', value: origDisplay });
-      ancestor = ancestor.parentElement;
+    // Walk intermediate ancestors (between video and the body-child) and
+    // make them fill their parent so the video can expand fully.
+    let el = videoElement.parentElement;
+    while (el && el !== bodyChild && el !== document.body) {
+      const orig = el.getAttribute('style') || '';
+      el.dataset.wpartyOrigStyle = orig;
+      hiddenElements.push(el);
+      el.style.cssText = orig + `;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+      `;
+      el = el.parentElement;
     }
 
     console.log('Watch Party: Theater mode enabled');
@@ -521,30 +542,17 @@
     if (!theaterModeActive) return;
     theaterModeActive = false;
 
-    // Remove theater style
+    // Remove the injected style and backdrop
     const styleEl = document.getElementById('wparty-theater-style');
     if (styleEl) styleEl.remove();
+    const backdrop = document.getElementById('wparty-theater-backdrop');
+    if (backdrop) backdrop.remove();
 
-    // Restore video container styles
-    if (videoElement) {
-      const container = findVideoContainer(videoElement);
-      if (container && container.dataset.wpartyOriginalStyle !== undefined) {
-        container.setAttribute('style', container.dataset.wpartyOriginalStyle);
-        delete container.dataset.wpartyOriginalStyle;
-      }
-      if (videoElement.dataset.wpartyOriginalStyle !== undefined) {
-        videoElement.setAttribute('style', videoElement.dataset.wpartyOriginalStyle);
-        delete videoElement.dataset.wpartyOriginalStyle;
-      }
-    }
-
-    // Restore hidden/modified elements
-    for (const item of hiddenElements) {
-      if (item.attr) {
-        item.el.removeAttribute(item.attr);
-      } else if (item.restore === 'display') {
-        item.el.style.display = item.value;
-        delete item.el.dataset.wpartyOrigDisplay;
+    // Restore original styles for all modified elements
+    for (const el of hiddenElements) {
+      if (el.dataset.wpartyOrigStyle !== undefined) {
+        el.setAttribute('style', el.dataset.wpartyOrigStyle);
+        delete el.dataset.wpartyOrigStyle;
       }
     }
     hiddenElements = [];
