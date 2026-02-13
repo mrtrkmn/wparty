@@ -1038,7 +1038,7 @@
 
     // Load saved hue
     chrome.storage.local.get(['accentHue'], (result) => {
-      if (result.accentHue !== undefined && result.accentHue !== null) {
+      if (result.accentHue != null) {
         const hue = result.accentHue;
         colorSlider.value = hue;
         overlayElement.style.setProperty('--accent-hue', hue);

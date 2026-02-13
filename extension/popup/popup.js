@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function applyAccentHue(hue) {
     document.documentElement.style.setProperty('--accent-hue', hue);
   }
-  if (savedData.accentHue !== undefined && savedData.accentHue !== null) {
+  if (savedData.accentHue != null) {
     accentHueSlider.value = savedData.accentHue;
     applyAccentHue(savedData.accentHue);
   }
