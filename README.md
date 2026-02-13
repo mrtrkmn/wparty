@@ -9,8 +9,15 @@ A Chrome extension that synchronizes video playback across multiple participants
 - 🌐 **Multiple Platform Support**: Works with YouTube, Vimeo, Dailymotion, Twitch, Netflix, Amazon Prime Video, Disney+, and any HTML5 video
 - 🔒 **Private Parties**: Create and join parties with unique 6-character codes
 - 🔐 **Password Protection**: Optional password protection for parties
-- 🏠 **Persistent Rooms**: Optional 24-hour persistence for party rooms
-- 👥 **Participant List**: See who's watching with you
+- 🏠 **Persistent Rooms**: Optional 24-hour persistence for party rooms with automatic cleanup
+- 👥 **Participant List**: See who's watching with you, with sync status indicators
+- 📋 **Available Parties Browser**: Discover and join public parties without needing a code
+- 🎭 **Theater Mode**: Immersive fullscreen video-focused view with collapsible overlay
+- 📍 **Draggable Overlay**: In-page participant overlay that can be moved anywhere on screen
+- 🔢 **Extension Badge**: Live participant count displayed on the extension icon
+- 📺 **Ad Detection**: Prevents sync events during YouTube and Twitch ads
+- 🎬 **YouTube Shorts Support**: Seamless sync between Shorts and regular video URLs
+- 🛡️ **Netflix DRM Handling**: Uses Netflix API to work with DRM-protected content
 - 🎨 **Modern UI**: Beautiful dark-themed interface
 - 🔄 **Auto-reconnect**: Automatic reconnection with exponential backoff
 - ⚙️ **Configurable Server**: Set your own signaling server URL
@@ -139,6 +146,9 @@ A Chrome extension that synchronizes video playback across multiple participants
 
 ```
 wparty/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml     # CI/CD deployment workflow
 ├── extension/              # Chrome extension
 │   ├── manifest.json      # Extension manifest (V3)
 │   ├── popup/             # Extension popup UI
@@ -150,6 +160,7 @@ wparty/
 │   ├── background/        # Service worker
 │   │   └── background.js
 │   └── icons/             # Extension icons
+│       ├── icon.svg
 │       ├── icon16.png
 │       ├── icon48.png
 │       └── icon128.png
@@ -157,6 +168,7 @@ wparty/
 │   ├── server.js
 │   ├── package.json
 │   └── Dockerfile
+├── INSTALL.md             # Quick installation guide
 ├── README.md
 └── LICENSE
 ```
@@ -187,6 +199,8 @@ All messages are JSON with this structure:
 - `sync`: Synchronize playback event
 - `participants`: Updated participant list
 - `video-info`: Video metadata update
+- `video-changed`: Notification when a participant changes video
+- `list-parties`: Request/response for available public parties
 - `party-created`: Party creation confirmation
 - `joined`: Join confirmation
 - `left`: Leave confirmation
@@ -197,13 +211,25 @@ All messages are JSON with this structure:
 
 1. **Sync Loop Prevention**: The content script uses an `isSyncing` flag to prevent infinite sync loops when applying remote events.
 
-2. **Time Drift Tolerance**: Only seeks if time difference exceeds 2 seconds to avoid micro-adjustments.
+2. **Time Drift Tolerance**: Only seeks if time difference exceeds 1 second to avoid micro-adjustments.
 
-3. **Reconnection Logic**: Exponential backoff with a maximum delay of 30 seconds.
+3. **Sync Cooldown**: Minimum 300ms between outgoing sync events to prevent rapid-fire updates.
 
-4. **Heartbeat**: Client sends ping every 25 seconds, server checks every 30 seconds.
+4. **Reconnection Logic**: Exponential backoff with a maximum delay of 30 seconds.
 
-5. **Party Codes**: 6 alphanumeric characters (uppercase), avoiding confusing characters like 0, O, I, 1.
+5. **Heartbeat**: Client sends ping every 25 seconds, server checks every 30 seconds.
+
+6. **Party Codes**: 6 alphanumeric characters (uppercase), avoiding confusing characters like 0, O, I, 1.
+
+7. **Theater Mode**: Uses fixed positioning with shadow DOM overlay for site isolation.
+
+8. **Ad Detection**: Detects YouTube and Twitch ads and suppresses sync events during ad playback.
+
+9. **Netflix DRM**: Uses the Netflix Cadmium API to handle seek operations on DRM-protected content.
+
+10. **In-page Overlay**: Shadow DOM (closed mode) overlay for participant list with drag-to-move support.
+
+11. **Persistent Party Cleanup**: Hourly cleanup of idle persistent parties after 24 hours of inactivity.
 
 ## Contributing
 
@@ -241,6 +267,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## Security Considerations
 
 - Party codes are randomly generated and should be kept private
+- Party passwords are hashed using SHA-256 before comparison
 - The server does not store video content, only metadata
 - All synchronization happens through the signaling server
 - No authentication is required (suitable for private/trusted groups)
@@ -255,11 +282,20 @@ MIT License - see [LICENSE](LICENSE) file for details
 - Uses Chrome Extension Manifest V3
 - Inspired by the need to watch videos together while apart
 
+## Deployment
+
+The project includes a GitHub Actions workflow (`.github/workflows/deploy.yml`) for automated deployment. Pushing to the `main` branch triggers the CI/CD pipeline.
+
 ## Future Enhancements
 
 - [x] Password-protected parties ✅
 - [x] Persistent party rooms ✅
 - [x] More streaming platform support (Netflix, Amazon Prime Video, Disney+) ✅
+- [x] Theater mode ✅
+- [x] Available parties browser ✅
+- [x] Sync status indicators ✅
+- [x] In-page participant overlay ✅
+- [x] Ad detection (YouTube, Twitch) ✅
 - [ ] Mobile app support
 - [ ] Browser extension for Firefox and Edge
 
