@@ -29,6 +29,19 @@
     return hostname === 'netflix.com' || hostname.endsWith('.netflix.com');
   }
 
+  // Detect if the current site is YouTube
+  function isYouTube() {
+    const hostname = window.location.hostname;
+    return hostname === 'youtube.com' || hostname.endsWith('.youtube.com');
+  }
+
+  // Send T keyboard event to YouTube player to toggle YouTube's native theater mode
+  function sendYouTubeTheaterKey() {
+    if (!isYouTube()) return;
+    const target = document.querySelector('#movie_player, #player-container, .html5-video-player') || document;
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', keyCode: 84, bubbles: true }));
+  }
+
   // Find Netflix's play/pause button and simulate a click to toggle playback.
   // This avoids directly calling .play()/.pause() on the video element which
   // triggers Netflix's Widevine DRM error M7375.
@@ -935,8 +948,10 @@
       const enabled = theaterCheckbox.checked;
       chrome.storage.local.set({ theaterMode: enabled });
       if (enabled) {
+        sendYouTubeTheaterKey();
         enableTheaterMode();
       } else {
+        sendYouTubeTheaterKey();
         disableTheaterMode();
       }
     });
@@ -1155,6 +1170,7 @@
         isInParty = false;
         currentPartyCode = null;
         console.log('Watch Party: Left party');
+        sendYouTubeTheaterKey();
         disableTheaterMode();
         chrome.storage.local.set({ theaterMode: false });
         removeOverlay();
@@ -1223,6 +1239,7 @@
         // Restore theater mode if it was enabled
         const stored = await chrome.storage.local.get(['theaterMode']);
         if (stored.theaterMode && videoElement) {
+          sendYouTubeTheaterKey();
           enableTheaterMode();
         }
       }
