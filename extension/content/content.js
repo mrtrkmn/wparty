@@ -580,6 +580,14 @@
     style.textContent = `
       :host {
         all: initial;
+        --accent-hue: 260;
+        --accent: hsl(var(--accent-hue), 92%, 66%);
+        --accent-light: hsl(var(--accent-hue), 80%, 78%);
+        --accent-lighter: hsl(var(--accent-hue), 82%, 85%);
+        --accent-bg: hsla(var(--accent-hue), 70%, 55%, 0.3);
+        --accent-bg-light: hsla(var(--accent-hue), 70%, 55%, 0.15);
+        --accent-bg-subtle: hsla(var(--accent-hue), 70%, 55%, 0.10);
+        --accent-border: hsla(var(--accent-hue), 70%, 55%, 0.4);
         position: fixed;
         top: 12px;
         right: 12px;
@@ -591,7 +599,7 @@
       }
       .wparty-panel {
         background: rgba(30, 30, 46, 0.92);
-        border: 1px solid rgba(139, 92, 246, 0.4);
+        border: 1px solid var(--accent-border);
         border-radius: 10px;
         color: #e0e0e0;
         min-width: 180px;
@@ -607,7 +615,7 @@
         align-items: center;
         justify-content: space-between;
         padding: 8px 12px;
-        background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(139, 92, 246, 0.3));
+        background: linear-gradient(135deg, var(--accent-bg), var(--accent-bg));
         cursor: move;
         user-select: none;
         -webkit-user-select: none;
@@ -638,7 +646,7 @@
       .wparty-toggle {
         background: none;
         border: none;
-        color: #c4b5fd;
+        color: var(--accent-lighter);
         cursor: pointer;
         font-size: 14px;
         padding: 0 2px;
@@ -660,22 +668,22 @@
         gap: 6px;
         padding: 6px 8px;
         margin-bottom: 6px;
-        background: rgba(99, 102, 241, 0.15);
+        background: var(--accent-bg-light);
         border-radius: 6px;
         font-size: 11px;
-        color: #c4b5fd;
+        color: var(--accent-lighter);
       }
       .wparty-party-code-value {
         font-family: monospace;
         font-weight: 700;
         font-size: 13px;
-        color: #a78bfa;
+        color: var(--accent-light);
         letter-spacing: 1px;
       }
       .wparty-party-code-copy {
         background: none;
         border: none;
-        color: #c4b5fd;
+        color: var(--accent-lighter);
         cursor: pointer;
         font-size: 12px;
         padding: 0 2px;
@@ -722,8 +730,8 @@
         white-space: nowrap;
       }
       .wparty-count {
-        background: rgba(139, 92, 246, 0.3);
-        color: #c4b5fd;
+        background: var(--accent-bg);
+        color: var(--accent-lighter);
         border-radius: 8px;
         padding: 1px 6px;
         font-size: 11px;
@@ -735,17 +743,17 @@
       .wparty-url-section {
         padding: 6px 8px;
         margin-top: 6px;
-        background: rgba(99, 102, 241, 0.10);
+        background: var(--accent-bg-subtle);
         border-radius: 6px;
         font-size: 11px;
-        color: #c4b5fd;
+        color: var(--accent-lighter);
         display: flex;
         align-items: center;
         gap: 4px;
         overflow: hidden;
       }
       .wparty-url-section a {
-        color: #a78bfa;
+        color: var(--accent-light);
         text-decoration: none;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -755,7 +763,7 @@
       }
       .wparty-url-section a:hover {
         text-decoration: underline;
-        color: #c4b5fd;
+        color: var(--accent-lighter);
       }
       .wparty-theater-section {
         display: flex;
@@ -763,14 +771,14 @@
         justify-content: space-between;
         padding: 6px 8px;
         margin-top: 6px;
-        background: rgba(99, 102, 241, 0.10);
+        background: var(--accent-bg-subtle);
         border-radius: 6px;
         font-size: 11px;
-        color: #c4b5fd;
+        color: var(--accent-lighter);
       }
       .wparty-theater-label {
         font-size: 11px;
-        color: #c4b5fd;
+        color: var(--accent-lighter);
       }
       .wparty-theater-toggle {
         position: relative;
@@ -807,10 +815,60 @@
         transition: transform 0.3s;
       }
       .wparty-theater-toggle input:checked + .wparty-theater-slider {
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
       }
       .wparty-theater-toggle input:checked + .wparty-theater-slider::before {
         transform: translateX(14px);
+      }
+      .wparty-color-section {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        margin-top: 6px;
+        background: var(--accent-bg-subtle);
+        border-radius: 6px;
+        font-size: 11px;
+        color: var(--accent-lighter);
+      }
+      .wparty-color-label {
+        font-size: 11px;
+        color: var(--accent-lighter);
+        white-space: nowrap;
+      }
+      .wparty-color-slider {
+        -webkit-appearance: none;
+        appearance: none;
+        flex: 1;
+        height: 10px;
+        border-radius: 5px;
+        background: linear-gradient(to right,
+          hsl(0,90%,65%), hsl(30,90%,65%), hsl(60,90%,65%),
+          hsl(90,90%,65%), hsl(120,90%,65%), hsl(150,90%,65%),
+          hsl(180,90%,65%), hsl(210,90%,65%), hsl(240,90%,65%),
+          hsl(270,90%,65%), hsl(300,90%,65%), hsl(330,90%,65%),
+          hsl(360,90%,65%));
+        outline: none;
+        cursor: pointer;
+      }
+      .wparty-color-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #fff;
+        border: 2px solid var(--accent);
+        cursor: pointer;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      }
+      .wparty-color-swatch {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        background: var(--accent);
+        flex-shrink: 0;
+        border: 1px solid rgba(255,255,255,0.2);
       }
     `;
 
@@ -952,6 +1010,45 @@
     theaterSection.appendChild(theaterLabel);
     theaterSection.appendChild(theaterToggleWrapper);
     body.appendChild(theaterSection);
+
+    // Color picker section
+    const colorSection = document.createElement('div');
+    colorSection.className = 'wparty-color-section';
+
+    const colorLabel = document.createElement('span');
+    colorLabel.className = 'wparty-color-label';
+    colorLabel.textContent = '🎨 Color';
+
+    const colorSlider = document.createElement('input');
+    colorSlider.type = 'range';
+    colorSlider.className = 'wparty-color-slider';
+    colorSlider.min = '0';
+    colorSlider.max = '360';
+    colorSlider.value = '260';
+
+    const colorSwatch = document.createElement('span');
+    colorSwatch.className = 'wparty-color-swatch';
+
+    colorSlider.addEventListener('input', (e) => {
+      e.stopPropagation();
+      const hue = colorSlider.value;
+      overlayElement.style.setProperty('--accent-hue', hue);
+      chrome.storage.local.set({ accentHue: parseInt(hue, 10) });
+    });
+
+    // Load saved hue
+    chrome.storage.local.get(['accentHue'], (result) => {
+      if (result.accentHue !== undefined && result.accentHue !== null) {
+        const hue = result.accentHue;
+        colorSlider.value = hue;
+        overlayElement.style.setProperty('--accent-hue', hue);
+      }
+    });
+
+    colorSection.appendChild(colorLabel);
+    colorSection.appendChild(colorSlider);
+    colorSection.appendChild(colorSwatch);
+    body.appendChild(colorSection);
 
     panel.appendChild(header);
     panel.appendChild(body);

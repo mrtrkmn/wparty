@@ -56,6 +56,13 @@
             <input type="text" id="serverUrl" placeholder="ws://localhost:8080">
             <button id="saveServerBtn" class="btn btn-secondary">Save</button>
           </div>
+          <div class="form-group color-setting">
+            <label for="accentHueSlider">🎨 Accent Color:</label>
+            <div class="color-slider-row">
+              <input type="range" id="accentHueSlider" class="accent-hue-slider" min="0" max="360" value="260">
+              <span id="accentSwatch" class="accent-swatch"></span>
+            </div>
+          </div>
         </div>
       </div>
 
