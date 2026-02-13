@@ -572,14 +572,16 @@
     if (grayscaleModeActive || !videoElement) return;
     grayscaleModeActive = true;
 
-    const styleEl = document.createElement('style');
-    styleEl.id = 'wparty-grayscale-style';
-    styleEl.textContent = `
-      .wparty-grayscale-video {
-        filter: grayscale(100%) !important;
-      }
-    `;
-    document.head.appendChild(styleEl);
+    if (!document.getElementById('wparty-grayscale-style')) {
+      const styleEl = document.createElement('style');
+      styleEl.id = 'wparty-grayscale-style';
+      styleEl.textContent = `
+        .wparty-grayscale-video {
+          filter: grayscale(100%) !important;
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
 
     videoElement.classList.add('wparty-grayscale-video');
 
